@@ -1,0 +1,40 @@
+# Databricks Asset Bundle del proyecto.
+# El host NO va aquí: se toma del perfil de `databricks auth login` (o de DATABRICKS_CONFIG_PROFILE).
+#   databricks bundle validate
+#   databricks bundle deploy -t dev
+#   databricks bundle run run_all -t dev
+bundle:
+  name: hardware-replacement-agent
+
+variables:
+  catalog:
+    description: Catálogo de Unity Catalog donde viven bronze/silver/gold.
+    default: emerson_hw
+
+resources:
+  jobs:
+    run_all:
+      name: run_all
+      description: Pipeline completo. 00 setup (catálogo, esquemas, volumen, copia de PDFs) -> 01 parsing bronze.
+      max_concurrent_runs: 1
+      # Los parámetros del job llegan a los widgets de los notebooks con el mismo nombre.
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: force
+          default: "false"
+      # Sin cluster ni environment: las tareas de notebook corren en serverless (único cómputo en Free Edition).
+      tasks:
+        - task_key: setup
+          notebook_task:
+            notebook_path: ./databricks/notebooks/00_setup.py
+        - task_key: parse
+          depends_on:
+            - task_key: setup
+          notebook_task:
+            notebook_path: ./databricks/notebooks/01_parse.py
+
+targets:
+  dev:
+    mode: development
+    default: true

@@ -1,34 +1,272 @@
-# Gold set for `make eval`. Only VERIFIED cases against data/raw belong here.
+# Gold set for `make eval`. Expectations come from the PDFs in data/raw (catalog + datasheets), never from
+# the system's own output. Each case says why in `notes`.
+#
 # Schema (validated by evaluation/run_eval.py):
-#   id: str                      unique case id
-#   query: str                   customer text
-#   expected_original: str|null  part number the agent must resolve
-#   expected_status: ACTIVE|DISCONTINUED|EOL|NRND|null   from the catalog
-#   expected_top: list[str]      acceptable ACTIVE substitutes (any of them at rank 1 = hit@1)
-#   expected_level: COMPATIBLE|COMPATIBLE_WITH_CONDITIONS|UNKNOWN|INCOMPATIBLE|null
-#   must_not_recommend: list[str]
-#   expect_clarification: bool
-#   verified_by: str|null        who checked it against the PDFs
-#   notes: str
-version: "0.1.0"
+#   id                  unique case id
+#   query               customer text (es/en)
+#   expected_original   part number the agent must resolve (null = no single part: find by requirements / clarify)
+#   expected_status     catalog status of expected_original
+#   expected_top        acceptable ACTIVE substitutes; the #1 confirmed recommendation must be one of them.
+#                       []   = no confirmed (COMPATIBLE / COMPATIBLE_WITH_CONDITIONS) recommendation expected
+#                       null = not evaluated (e.g. the part is still ACTIVE)
+#   expected_level      level of the #1 recommendation (null = not evaluated)
+#   must_not_recommend  part numbers that must never appear among recommendations
+#   expect_clarification
+#   clarification_mentions  part numbers the clarification question must suggest
+#   relevant_documents  datasheets a retriever should surface for this query (retrieval metrics); [] = skip
+#   verified_by         who checked the expectation against the PDFs
+#   notes               justification with the source
+version: "1.0.0"
 cases:
-  - id: PLACEHOLDER-01
-    query: "PLACEHOLDER — reemplazar con casos reales verificados"
+  # ---------------------------------------------------------------- official case and variants
+  - id: GS-01
+    query: "Necesito una tarjeta de red 100 Gigabit Ethernet con soporte RDMA y offload de IPsec. Usábamos la Intel E810 pero ya no la encuentro"
+    expected_original: E810-CQDA2
+    expected_status: DISCONTINUED
+    expected_top: [MCX75310AAS-NEAT, BCM57508]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
+    must_not_recommend: [E810-CQDA2]
+    expect_clarification: false
+    relevant_documents: [Intel_E810_100GbE_NIC.pdf, NVIDIA_ConnectX-7_400GbE_SmartNIC.pdf, broadcom-bcm57508-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Caso oficial. Aviso de la E810: 'consider NVIDIA ConnectX-7 (MCX75310AAS-NEAT)… Alternatively, Broadcom BCM57508'. Ambos ACTIVE, RDMA RoCE v2 e IPsec. Más velocidad (400/200 GbE) cambia ópticas/switch ⇒ con condiciones."
+  - id: GS-02
+    query: "Looking for a replacement for the discontinued Intel E810 100GbE NIC, we need RDMA"
+    expected_original: E810-CQDA2
+    expected_status: DISCONTINUED
+    expected_top: [MCX75310AAS-NEAT, BCM57508]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
+    must_not_recommend: [E810-CQDA2]
+    expect_clarification: false
+    relevant_documents: [Intel_E810_100GbE_NIC.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Variante en inglés del caso oficial."
+  - id: GS-03
+    query: "Reemplazo para la E81O-CQDA2"
     expected_original: null
     expected_status: null
     expected_top: []
     expected_level: null
+    must_not_recommend: [E810-CQDA2]
+    expect_clarification: true
+    clarification_mentions: [E810-CQDA2]
+    relevant_documents: []
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Part number mal escrito (letra O por cero). Regla: nunca asumir una pieza parecida; debe preguntar sugiriendo E810-CQDA2."
+  - id: GS-04
+    query: "Necesito una NIC de 800 Gigabit para reemplazar la E810"
+    expected_original: E810-CQDA2
+    expected_status: DISCONTINUED
+    expected_top: []
+    expected_level: null
+    must_not_recommend: [MCX75310AAS-NEAT, BCM57508, E810-CQDA2]
+    expect_clarification: false
+    relevant_documents: []
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Requisito imposible: ninguna NIC del catálogo llega a 800 GbE (máx. ConnectX-7 400 GbE)."
+
+  # ---------------------------------------------------------------- DAQ
+  - id: GS-05
+    query: "Necesito reemplazar la USB-2627"
+    expected_original: USB-2627
+    expected_status: DISCONTINUED
+    expected_top: [USB-2633]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
+    must_not_recommend: [USB-1608GX, USB-1808X, USB-6001, AD7606]
+    expect_clarification: false
+    relevant_documents: [USB-2627_Multifunction_DAQ.pdf, USB-2633_Multifunction_DAQ.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Datasheet USB-2627: 'Recommended replacement: USB-2633'. Única ACTIVE con 64 entradas; USB 3.0 en puerto 2.0 ⇒ condición. USB-1808X solo 16 entradas."
+  - id: GS-06
+    query: "reemplazo para el usb 2627"
+    expected_original: USB-2627
+    expected_status: DISCONTINUED
+    expected_top: [USB-2633]
+    expected_level: null
+    must_not_recommend: [USB-1808X, AD7606]
+    expect_clarification: false
+    relevant_documents: []
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Variante en minúsculas y separada."
+  - id: GS-07
+    query: "La USB-1608GX ya no se vende, ¿con qué la sustituyo?"
+    expected_original: USB-1608GX
+    expected_status: DISCONTINUED
+    expected_top: [USB-1808X, USB-2633]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
+    must_not_recommend: [AD7606, USB-6001, USB-2627]
+    expect_clarification: false
+    relevant_documents: [USB-1608GX-data.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "1608GX: 16 SE, 16 bit, 500 kS/s, USB 2.0. 1808X (16 SE, 18 bit, 1 MS/s) y 2633 (64 SE, 2 MS/s) lo superan; ambos USB 3.0. AD7606 es SPI/paralelo, no USB."
+  - id: GS-08
+    query: "Necesito reemplazar la NI USB-6001"
+    expected_original: USB-6001
+    expected_status: EOL
+    expected_top: [USB-1808X, USB-2633]
+    expected_level: null
+    must_not_recommend: [AD7606, USB-1608GX, USB-2627]
+    expect_clarification: false
+    relevant_documents: [NI-USB-6001-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "USB-6001: 8 SE, 14 bit, 20 kS/s, USB 2.0. AD7606 no es un dispositivo USB."
+  - id: GS-09
+    query: "Necesito una DAQ USB con 64 canales"
+    expected_original: null
+    expected_status: null
+    expected_top: [USB-2633]
+    expected_level: COMPATIBLE
+    must_not_recommend: [USB-2627, USB-1808X, USB-1608GX]
+    expect_clarification: false
+    relevant_documents: [USB-2633_Multifunction_DAQ.pdf, USB-2627_Multifunction_DAQ.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Búsqueda por requisitos: la única DAQ ACTIVE con 64 entradas es la USB-2633 (la 2627 está DISCONTINUED)."
+
+  # ---------------------------------------------------------------- GPU
+  - id: GS-10
+    query: "Necesito reemplazar la NVIDIA A100 80GB"
+    expected_original: A100-SXM4-80GB
+    expected_status: NRND
+    expected_top: []
+    expected_level: null
+    must_not_recommend: [RTX-4090]
+    expect_clarification: false
+    relevant_documents: [NVIDIA_A100_80GB_GPU.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "El datasheet llama al H100 'drop-in replacement… in most AI training frameworks' (software), pero los SKU del catálogo son SXM4 vs SXM5 (factor de forma distinto). Decisión de dominio documentada: no es sustituto directo; debe explicarse. RTX 4090: 24 GB < 80 GB."
+  - id: GS-11
+    query: "Busco una GPU de 80GB"
+    expected_original: null
+    expected_status: null
+    expected_top: [MI300X, H100-SXM5]
+    expected_level: COMPATIBLE
+    must_not_recommend: [RTX-4090, A100-SXM4-80GB]
+    expect_clarification: false
+    relevant_documents: [NVIDIA_H100_SXM5_GPU.pdf, amd-mi300x-datasheet.pdf, NVIDIA_A100_80GB_GPU.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "ACTIVE con ≥80 GB: MI300X (192 GB) y H100 (80 GB). A100 es NRND (solo opción con riesgo). RTX 4090: 24 GB."
+
+  # ---------------------------------------------------------------- other categories
+  - id: GS-12
+    query: "Necesito sustituir el microcontrolador ATSAMD21G18A"
+    expected_original: ATSAMD21G18A
+    expected_status: DISCONTINUED
+    expected_top: [ESP32-S3, RP2040, STM32H743ZIT6]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
     must_not_recommend: []
     expect_clarification: false
-    verified_by: null
-    notes: "PLACEHOLDER — reemplazar con casos reales verificados (p. ej. caso oficial E810)."
-  - id: PLACEHOLDER-02
-    query: "PLACEHOLDER — reemplazar con casos reales verificados"
+    relevant_documents: [atsamd21-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Las tres ACTIVE tienen ≥32 KB SRAM pero otro núcleo (LX7, dual M0+, M7) ⇒ portar firmware: con condiciones."
+  - id: GS-13
+    query: "Necesito reemplazar el sensor MPU-6050"
+    expected_original: MPU-6050
+    expected_status: DISCONTINUED
+    expected_top: []
+    expected_level: null
+    must_not_recommend: [BME680]
+    expect_clarification: false
+    relevant_documents: [mpu6050-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "MPU-6050 es IMU (giroscopio + acelerómetro); el único sensor ACTIVE (BME680) mide gas/presión/humedad/temperatura."
+  - id: GS-14
+    query: "Reemplazo para el WD Ultrastar SN860 de 6.4TB"
+    expected_original: WUS4C6464DSP3X5
+    expected_status: DISCONTINUED
+    expected_top: []
+    expected_level: null
+    must_not_recommend: [MZ-V9P2T0]
+    expect_clarification: false
+    relevant_documents: [wd-ultrastar-dc-sn860.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "990 PRO: 2 TB < 6.4 TB y M.2 frente a U.2."
+  - id: GS-15
+    query: "El regulador IR3555MTRPBF está en EOL, ¿qué uso?"
+    expected_original: IR3555MTRPBF
+    expected_status: EOL
+    expected_top: []
+    expected_level: null
+    must_not_recommend: [TPS65982AB]
+    expect_clarification: false
+    relevant_documents: [ir3555-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "IR3555 es etapa de potencia de 60 A (VRM); TPS65982 es controlador USB Type-C/PD: otra función."
+  - id: GS-16
+    query: "Necesito reemplazar la FPGA XC7A200T"
+    expected_original: XC7A200T
+    expected_status: NRND
+    expected_top: [AGFB014R24A]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
+    must_not_recommend: [ICE40UP5K]
+    expect_clarification: false
+    relevant_documents: [xilinx-artix7-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Artix-7 200T: 215,360 celdas. Agilex 7 (1.4M) la supera con otro encapsulado; iCE40 (5,280 LUTs) no alcanza."
+  - id: GS-17
+    query: "Necesito reemplazar el Arm Cortex-A78"
+    expected_original: Cortex-A78
+    expected_status: NRND
+    expected_top: []
+    expected_level: null
+    must_not_recommend: [EPYC-9654]
+    expect_clarification: false
+    relevant_documents: [arm-cortex-a78-trm.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Núcleo ARMv8.2-A; las CPU ACTIVE del catálogo son x86 (EPYC Zen 4; el Xeon no declara arquitectura): ninguna confirmada."
+
+  # ---------------------------------------------------------------- ACTIVE parts, unknown parts, vague queries
+  - id: GS-18
+    query: "¿Qué precio y stock tiene la MCX75310AAS-NEAT?"
+    expected_original: MCX75310AAS-NEAT
+    expected_status: ACTIVE
+    expected_top: null
+    expected_level: null
+    must_not_recommend: [E810-CQDA2]
+    expect_clarification: false
+    relevant_documents: [NVIDIA_ConnectX-7_400GbE_SmartNIC.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Pieza ACTIVE: 1,250.00 USD y 120 unidades según el catálogo."
+  - id: GS-19
+    query: "Necesito un reemplazo para la BCM57508"
+    expected_original: BCM57508
+    expected_status: ACTIVE
+    expected_top: null
+    expected_level: null
+    must_not_recommend: [E810-CQDA2]
+    expect_clarification: false
+    relevant_documents: []
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "La pieza sigue ACTIVE; nunca debe sugerirse la E810 descontinuada."
+  - id: GS-20
+    query: "Necesito reemplazar el XYZ-9999"
     expected_original: null
     expected_status: null
     expected_top: []
     expected_level: null
     must_not_recommend: []
     expect_clarification: true
-    verified_by: null
-    notes: "PLACEHOLDER — reemplazar con casos reales verificados (consulta ambigua → CLARIFY)."
+    relevant_documents: []
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Part number inexistente y sin categoría: debe pedir aclaración, no inventar."
+  - id: GS-21
+    query: "Busco un microcontrolador barato"
+    expected_original: null
+    expected_status: null
+    expected_top: []
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: true
+    relevant_documents: []
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Solo categoría, sin requisitos ni part number."
+  - id: GS-22
+    query: "hola, necesito ayuda"
+    expected_original: null
+    expected_status: null
+    expected_top: []
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: true
+    relevant_documents: []
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Consulta sin información."

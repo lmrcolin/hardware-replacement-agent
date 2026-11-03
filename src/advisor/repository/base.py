@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from pathlib import Path
 
 import networkx as nx
 
@@ -32,34 +31,6 @@ class ArtifactRepository(ABC):
 
     @abstractmethod
     def save_compat_matrix(self, results: Sequence[CompatibilityResult]) -> None: ...
-
-
-class LocalParquetRepository(ArtifactRepository):
-    """artifacts/{products,chunks,compat_matrix}.parquet + artifacts/graph.json. B-20."""
-
-    def __init__(self, root: Path) -> None:
-        self.root = root
-
-    def load_products(self) -> list[Product]:
-        raise NotImplementedError("B-20 repository.LocalParquetRepository.load_products")
-
-    def load_chunks(self) -> list[Chunk]:
-        raise NotImplementedError("B-20 repository.LocalParquetRepository.load_chunks")
-
-    def load_graph(self) -> nx.MultiDiGraph:
-        raise NotImplementedError("B-20 repository.LocalParquetRepository.load_graph")
-
-    def load_compat_matrix(self) -> list[CompatibilityResult]:
-        raise NotImplementedError("B-20 repository.LocalParquetRepository.load_compat_matrix")
-
-    def save_products(self, products: Sequence[Product]) -> None:
-        raise NotImplementedError("B-20 repository.LocalParquetRepository.save_products")
-
-    def save_chunks(self, chunks: Sequence[Chunk]) -> None:
-        raise NotImplementedError("B-20 repository.LocalParquetRepository.save_chunks")
-
-    def save_compat_matrix(self, results: Sequence[CompatibilityResult]) -> None:
-        raise NotImplementedError("B-20 repository.LocalParquetRepository.save_compat_matrix")
 
 
 class DatabricksSQLRepository(ArtifactRepository):

@@ -121,7 +121,6 @@ def test_chunk_ids_are_stable() -> None:
     ]
 
 
-@pending("B-09")
 def test_graph_roundtrip(products: dict[str, Product], tmp_path: Path) -> None:
     g = kg.build_graph(list(products.values()), [])
     kg.save(g, tmp_path / "graph.json")
@@ -130,36 +129,30 @@ def test_graph_roundtrip(products: dict[str, Product], tmp_path: Path) -> None:
 
 
 # ---------- Inteligencia ----------
-@pending("B-11")
 def test_resolve_part_fuzzy(mock_graph: nx.MultiDiGraph) -> None:
     assert kg.resolve_part(mock_graph, "syn nic 100")[0].part_number == "SYN-NIC-100"
 
 
-@pending("B-12")
 def test_candidate_neighbors(mock_graph: nx.MultiDiGraph) -> None:
     parts = {c.part_number for c in kg.candidate_neighbors(mock_graph, "SYN-NIC-100")}
     assert "SYN-NIC-200" in parts and "SYN-NIC-100" not in parts
 
 
-@pending("B-13")
 def test_bm25_respects_top_k() -> None:
     assert len(BM25Retriever([]).search("100GbE RDMA", top_k=3)) <= 3
 
 
-@pending("B-14")
 def test_commercial_engine(commercial_rows: list[CommercialInformation]) -> None:
     engine = CommercialEngine(commercial_rows)
     assert engine.get("SYN-NIC-200").status is CommercialStatus.ACTIVE
     assert engine.availability("SYN-GPU-100").price_usd is None  # NRND: no price
 
 
-@pending("B-15")
 def test_category_mismatch_is_incompatible(products: dict[str, Product]) -> None:
     result = evaluate(products["SYN-NIC-100"], products["SYN-MCU-100"], [])
     assert result.level is CompatibilityLevel.INCOMPATIBLE
 
 
-@pending("B-15")
 def test_missing_required_spec_is_never_compatible(products: dict[str, Product]) -> None:
     req = TechnicalRequirement(
         key="rdma", operator=Operator.HAS, value="RoCE v2", origin=RequirementOrigin.QUERY
@@ -170,7 +163,6 @@ def test_missing_required_spec_is_never_compatible(products: dict[str, Product])
     assert result.level in (CompatibilityLevel.UNKNOWN, CompatibilityLevel.INCOMPATIBLE)
 
 
-@pending("B-16")
 def test_derive_requirements_keeps_query_requirements(products: dict[str, Product]) -> None:
     req = TechnicalRequirement(
         key="port_speed", operator=Operator.GTE, value=100, origin=RequirementOrigin.QUERY
@@ -179,7 +171,6 @@ def test_derive_requirements_keeps_query_requirements(products: dict[str, Produc
     assert req in derive_requirements(products["SYN-NIC-100"], query)
 
 
-@pending("B-17")
 def test_rank_only_recommends_active(products: dict[str, Product]) -> None:
     results = [
         evaluate(products["SYN-NIC-100"], products["SYN-NIC-200"], []),
@@ -189,13 +180,11 @@ def test_rank_only_recommends_active(products: dict[str, Product]) -> None:
     assert [r.product.part_number for r in out.recommendations] == ["SYN-NIC-200"]
 
 
-@pending("B-18")
 def test_template_llm_parses_query() -> None:
     parsed = TemplateClient().complete_json("Reemplazo para SYN-NIC-100", ParsedQuery)
     assert "SYN-NIC-100" in parsed.part_numbers
 
 
-@pending("B-19")
 def test_agent_recommends_only_active(
     products: dict[str, Product],
     commercial_rows: list[CommercialInformation],
@@ -213,7 +202,6 @@ def test_agent_recommends_only_active(
 
 
 # ---------- Producto ----------
-@pending("B-20")
 def test_local_repository_roundtrip(products: dict[str, Product], tmp_path: Path) -> None:
     repo = LocalParquetRepository(tmp_path)
     repo.save_products(list(products.values()))

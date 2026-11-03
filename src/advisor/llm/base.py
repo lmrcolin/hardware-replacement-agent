@@ -2,13 +2,29 @@
 
 from __future__ import annotations
 
+import json
+import re
 from abc import ABC, abstractmethod
+from typing import Any
 
+import httpx
 from pydantic import BaseModel
+
+from advisor.llm.prompts import extract_draft, extract_query
+from advisor.llm.rules import parse_query
+from advisor.models import ParsedQuery
 
 
 class LLMUnavailableError(RuntimeError):
-    """Provider unreachable, rate-limited or timed out; caller falls back to the next one."""
+    """Provider unreachable, rate-limited, timed out or unable to answer; try the next one."""
+
+
+def _json_object(text: str) -> str:
+    """The outermost {...} block of a model answer (models sometimes wrap JSON in prose)."""
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        raise LLMUnavailableError("model answer contains no JSON object")
+    return text[start : end + 1]
 
 
 class LLMClient(ABC):
@@ -28,14 +44,34 @@ class DatabricksFMAPIClient(LLMClient):
 
     name = "databricks"
 
-    def __init__(self, endpoint: str, profile: str, timeout_s: float = 30.0) -> None:
+    def __init__(self, endpoint: str, profile: str | None, timeout_s: float = 30.0) -> None:
         self.endpoint, self.profile, self.timeout_s = endpoint, profile, timeout_s
 
+    def _chat(self, prompt: str) -> str:
+        try:
+            from databricks.sdk import WorkspaceClient
+            from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
+
+            client = WorkspaceClient(profile=self.profile)
+            response = client.serving_endpoints.query(
+                name=self.endpoint,
+                messages=[ChatMessage(role=ChatMessageRole.USER, content=prompt)],
+                temperature=0.0,
+                max_tokens=1200,
+            )
+            message = response.choices[0].message if response.choices else None
+            content = message.content if message else None
+        except Exception as exc:  # SDK raises many error types; all mean "try the next provider"
+            raise LLMUnavailableError(f"databricks: {exc}") from exc
+        if not content:
+            raise LLMUnavailableError("databricks: empty answer")
+        return str(content)
+
     def complete_json[T: BaseModel](self, prompt: str, schema: type[T]) -> T:
-        raise NotImplementedError("B-18 llm.DatabricksFMAPIClient.complete_json")
+        return schema.model_validate_json(_json_object(self._chat(prompt)))
 
     def generate(self, prompt: str) -> str:
-        raise NotImplementedError("B-18 llm.DatabricksFMAPIClient.generate")
+        return self._chat(prompt).strip()
 
 
 class OllamaClient(LLMClient):
@@ -44,22 +80,53 @@ class OllamaClient(LLMClient):
     name = "ollama"
 
     def __init__(self, model: str, host: str, timeout_s: float = 30.0) -> None:
-        self.model, self.host, self.timeout_s = model, host, timeout_s
+        self.model, self.host, self.timeout_s = model, host.rstrip("/"), timeout_s
+
+    def is_available(self) -> bool:
+        try:
+            response = httpx.get(f"{self.host}/api/tags", timeout=1.0)
+            models = [m.get("name", "") for m in response.json().get("models", [])]
+        except (httpx.HTTPError, ValueError):
+            return False
+        return response.status_code == 200 and any(m.startswith(self.model) for m in models)
+
+    def _generate(self, prompt: str, fmt: dict[str, Any] | None) -> str:
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"temperature": 0},
+        }
+        if fmt is not None:
+            payload["format"] = fmt
+        try:
+            response = httpx.post(f"{self.host}/api/generate", json=payload, timeout=self.timeout_s)
+            response.raise_for_status()
+            text = response.json().get("response", "")
+        except (httpx.HTTPError, ValueError) as exc:
+            raise LLMUnavailableError(f"ollama: {exc}") from exc
+        # qwen3 may emit a <think>…</think> block before the answer.
+        return re.sub(r"<think>.*?</think>", "", str(text), flags=re.S).strip()
 
     def complete_json[T: BaseModel](self, prompt: str, schema: type[T]) -> T:
-        raise NotImplementedError("B-18 llm.OllamaClient.complete_json")
+        return schema.model_validate_json(
+            _json_object(self._generate(prompt, schema.model_json_schema()))
+        )
 
     def generate(self, prompt: str) -> str:
-        raise NotImplementedError("B-18 llm.OllamaClient.generate")
+        return self._generate(prompt, None)
 
 
 class TemplateClient(LLMClient):
-    """Deterministic last resort: rule-based NLU and template NLG. Always available."""
+    """Deterministic last resort: rule-based NLU and the verified draft as NLG. Always available."""
 
     name = "template"
 
     def complete_json[T: BaseModel](self, prompt: str, schema: type[T]) -> T:
-        raise NotImplementedError("B-18 llm.TemplateClient.complete_json")
+        if schema is not ParsedQuery:
+            raise LLMUnavailableError(f"template cannot produce {schema.__name__}")
+        parsed = parse_query(extract_query(prompt))
+        return schema.model_validate(json.loads(parsed.model_dump_json()))
 
     def generate(self, prompt: str) -> str:
-        raise NotImplementedError("B-18 llm.TemplateClient.generate")
+        return extract_draft(prompt)

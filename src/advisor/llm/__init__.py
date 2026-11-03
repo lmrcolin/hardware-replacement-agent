@@ -7,6 +7,9 @@ from advisor.llm.base import (
     OllamaClient,
     TemplateClient,
 )
+from advisor.llm.chain import build_llm_chain, complete_json, generate
+from advisor.llm.prompts import build_nlg_prompt, build_nlu_prompt
+from advisor.llm.rules import parse_query
 
 __all__ = [
     "DatabricksFMAPIClient",
@@ -14,4 +17,10 @@ __all__ = [
     "LLMUnavailableError",
     "OllamaClient",
     "TemplateClient",
+    "build_llm_chain",
+    "build_nlg_prompt",
+    "build_nlu_prompt",
+    "complete_json",
+    "generate",
+    "parse_query",
 ]

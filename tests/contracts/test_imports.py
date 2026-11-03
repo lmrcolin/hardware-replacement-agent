@@ -37,7 +37,11 @@ FORBIDDEN: dict[str, set[str]] = {
     "recommendation": {"advisor.llm", "advisor.retrieval", "httpx", "databricks"},
     "models": {"advisor"},  # models depend on nothing internal except themselves
 }
-APP_ALLOWED = {"advisor.models", "advisor.agent", "advisor.repository", "advisor.config", "advisor"}
+# advisor.pipeline is the composition root (builds the real agent).
+APP_ALLOWED = {
+    "advisor.models", "advisor.agent", "advisor.repository", "advisor.config", "advisor.pipeline",
+    "advisor",
+}  # fmt: skip
 
 
 def imported_modules(source: str) -> set[str]:

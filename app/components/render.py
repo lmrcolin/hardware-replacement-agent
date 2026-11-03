@@ -113,7 +113,7 @@ def expert_summary(response: RecommendationResponse) -> str:
     if response.original and response.original.commercial:
         c = response.original.commercial
         lines.append(f"Original: {response.original.part_number} ({c.description}) — {c.status}")
-    for rec in response.recommendations + response.risky_options:
+    for rec in response.recommendations + response.risky_options + response.unverified_options:
         lines.append(
             f"- {rec.product.part_number}: {rec.compatibility.level}; "
             f"condiciones: {'; '.join(rec.compatibility.conditions) or 'ninguna'}; "
@@ -147,6 +147,14 @@ def response_view(response: RecommendationResponse, names: dict[str, str]) -> No
             "sin precio de venta vigente."
         )
         for rec in response.risky_options:
+            recommendation_card(rec, names)
+    if response.unverified_options:
+        st.markdown("### Posibles, sin datos suficientes")
+        st.caption(
+            "Su datasheet no declara algún dato crítico: la compatibilidad no está confirmada y "
+            "requiere validación de un experto. No se presentan como recomendados."
+        )
+        for rec in response.unverified_options:
             recommendation_card(rec, names)
     for warning in response.warnings:
         st.caption(f"Aviso: {warning}")

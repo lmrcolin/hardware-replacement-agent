@@ -46,7 +46,7 @@ silver debe fallar si algún part number del catálogo no coincide literalmente 
 **Consecuencias:** el notebook de silver necesita `pdfplumber` en el entorno serverless (verificar `%pip install`
 con el egress de Free Edition en FEATURE_MATRIX); si no está disponible, se sube `silver.commercial` desde local.
 
-## ADR-013 Candidatos UNKNOWN fuera de `recommendations` (Propuesto — requiere `contract-change`)
+## ADR-013 Candidatos UNKNOWN fuera de `recommendations` (Aceptado — implementado en `CONTRACT_VERSION` 1.1.0)
 **Contexto:** hoy un candidato con nivel UNKNOWN (falta un dato crítico en su datasheet) aparece al final de
 `recommendations`, con su nivel visible en la UI. Caso real: Cortex-A78 → w9-3595X (el datasheet del Xeon no declara su
 arquitectura). La regla del producto dice que nunca se presenta una alternativa como técnicamente segura sin evidencia
@@ -61,4 +61,6 @@ suficiente; aunque la UI lo etiqueta, estar en la lista de "recomendados" comuni
 **Propuesta:** opción 2. Cambios: `models/recommendation.py` (campo + validadores; `recommendations` solo COMPATIBLE y
 COMPATIBLE_WITH_CONDITIONS), `recommendation/ranking.py` (`RankedOutput` con tercera lista), `agent` (pasa la lista),
 `app/components/render.py` (sección propia), `evaluation` (hit@1 ya ignora UNKNOWN), bump `CONTRACT_VERSION` a 1.1.0.
-**Estado:** pendiente de acuerdo con Kevin (PR `contract-change`).
+**Estado:** implementado en la rama `contract/unverified-options` (cambio de contrato). `recommendations` solo admite
+COMPATIBLE / COMPATIBLE_WITH_CONDITIONS; `unverified_options` solo ACTIVE + UNKNOWN; `RankedOutput` tiene tercera lista;
+el borrador y la UI los muestran como "Posibles, sin datos suficientes". Caso real: Cortex-A78 → w9-3595X.

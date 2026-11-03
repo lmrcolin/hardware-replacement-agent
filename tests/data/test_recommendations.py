@@ -102,6 +102,12 @@ def test_invariants_for_every_non_active_part(products: dict[str, Product]) -> N
             assert not critical_fail, (part, rec.product.part_number)
         assert all(r.commercial.status is CommercialStatus.ACTIVE for r in out.recommendations)
         assert all(r.commercial.status is CommercialStatus.NRND for r in out.risky_options)
+        assert all(
+            r.compatibility.level is not CompatibilityLevel.UNKNOWN for r in out.recommendations
+        )
+        assert all(
+            r.compatibility.level is CompatibilityLevel.UNKNOWN for r in out.unverified_options
+        )
 
 
 @pytest.mark.parametrize(
@@ -123,4 +129,6 @@ def test_known_outcomes(products: dict[str, Product], part: str, expected: list[
 
 def test_arm_core_never_gets_a_confirmed_x86_replacement(products: dict[str, Product]) -> None:
     out = recommend(products, "Cortex-A78")
-    assert all(r.compatibility.level is CompatibilityLevel.UNKNOWN for r in out.recommendations)
+    assert out.recommendations == []  # ADR-013: UNKNOWN is never presented as recommended
+    assert [r.product.part_number for r in out.unverified_options] == ["w9-3595X"]
+    assert "architecture" in out.unverified_options[0].compatibility.missing

@@ -30,7 +30,8 @@ resources:
       name: run_all
       description: >-
         Pipeline completo en serverless: 00 setup (catálogo, volúmenes, PDFs, wheel) -> 01 parsing
-        bronze -> 02 silver/gold.products -> 03 chunks -> 04 grafo -> 05 matriz -> 06 artefactos.
+        bronze -> 02 silver/gold.products -> 03 chunks -> 04 grafo -> 05 matriz -> 06 artefactos;
+        07 re-sincroniza AI Search (opcional) tras 03.
       max_concurrent_runs: 1
       # Los parámetros del job llegan a los widgets de los notebooks con el mismo nombre.
       parameters:
@@ -83,6 +84,13 @@ resources:
           environment_key: py312
           notebook_task:
             notebook_path: ./databricks/notebooks/06_export_artifacts.py
+        # Opcional: re-sincroniza el índice de AI Search (TRIGGERED) tras reescribir los chunks.
+        # Si el índice no existe, el notebook termina en SKIP sin fallar.
+        - task_key: sync_ai_search
+          depends_on:
+            - task_key: chunk_index
+          notebook_task:
+            notebook_path: ./databricks/notebooks/07_sync_ai_search.py
 
 targets:
   dev:

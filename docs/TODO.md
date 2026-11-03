@@ -44,7 +44,7 @@ Primer comando:
 make setup
 uv run streamlit run app/streamlit_app.py   # MockAdvisorAgent
 ```
-- [ ] B-20 `LocalParquetRepository` (luego `DatabricksSQLRepository`)
+- [x] B-20 `LocalParquetRepository` (`DatabricksSQLRepository` pendiente)
 - [ ] B-21 UI final sobre `RecommendationResponse`
 - [ ] B-22 `gold_set.yaml` con casos reales verificados + scoring en `run_eval.py`
 - [ ] B-23 `build_tco_excel.py`

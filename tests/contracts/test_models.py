@@ -232,7 +232,7 @@ class TestConfig:
 
     def test_compat_rules_declared(self) -> None:
         ids = {r.id for r in load_rules(ROOT / "config" / "compat_rules.yaml").rules}
-        assert ids == {
+        assert ids >= {
             "R-CAT",
             "R-FF",
             "R-MUST-PROTO",

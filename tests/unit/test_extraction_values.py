@@ -83,3 +83,10 @@ def test_canonical_interface(raw: str, expected: str) -> None:
 def test_bool_and_list() -> None:
     assert parse_bool("yes") is True and parse_bool("none (via chipset)") is False
     assert parse_list("SXM4 (for DGX/HGX systems), PCIe dual-slot") == ["SXM4", "PCIe dual-slot"]
+
+
+def test_unit_tokens_belong_to_one_family() -> None:
+    from advisor.extraction.values import _FAMILIES
+
+    tokens = [t for units in _FAMILIES.values() for t in units]
+    assert len(tokens) == len(set(tokens))

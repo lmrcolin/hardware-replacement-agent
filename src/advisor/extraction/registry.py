@@ -12,6 +12,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from advisor.models import Category
 
 SpecType = Literal["number", "string", "boolean", "list", "range"]
+Compare = Literal["gte", "lte", "eq", "interface", "has_all", "intersects", "contains"]
+_DEFAULT_COMPARE: dict[str, Compare] = {
+    "number": "gte", "range": "contains", "list": "has_all", "string": "eq", "boolean": "eq",
+}  # fmt: skip
 
 
 class SpecDefinition(BaseModel):
@@ -24,6 +28,13 @@ class SpecDefinition(BaseModel):
     aliases: list[str] = []
     patterns: list[str] = []
     keywords: list[str] = []
+    compare: Compare | None = None
+    derive: bool = True
+    upgrade_condition: str | None = None
+
+    @property
+    def comparison(self) -> Compare:
+        return self.compare or _DEFAULT_COMPARE[self.type]
 
     @field_validator("aliases")
     @classmethod

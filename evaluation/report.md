@@ -22,6 +22,7 @@ Generado por `make eval` el 2026-11-03 · LLM: `template` · retriever: `bm25` �
 | gate_forbidden_recommendations | 0 |
 | gate_non_active_recommendations | 0 |
 | gate_price_stock_mismatches | 0 |
+| verify_fallbacks | 0 |
 | gate_unverified_text | 0 |
 
 ## Por caso

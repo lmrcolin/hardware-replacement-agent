@@ -14,8 +14,8 @@ import networkx as nx
 from advisor.agent.compose import draft_message, unverified_tokens
 from advisor.commercial import CommercialEngine
 from advisor.compatibility import derive_requirements, evaluate
-from advisor.compatibility.engine import base_key, default_registry
-from advisor.extraction import SpecRegistry
+from advisor.compatibility.engine import ANY, base_key, default_registry
+from advisor.extraction import SpecDefinition, SpecRegistry
 from advisor.kg import candidate_neighbors, resolve_part
 from advisor.llm import (
     LLMClient,
@@ -100,9 +100,7 @@ class AdvisorAgent:
     def _parse(self, run: _Run) -> ParsedQuery:
         run.trace.append(AgentStep.PARSE)
         allowed = {
-            cat.value: [
-                f"{k} ({d.unit or d.type})" for k, d in self.registry.for_category(cat).items()
-            ]
+            cat.value: [_describe(k, d) for k, d in self.registry.for_category(cat).items()]
             for cat in Category
         }
         prompt = build_nlu_prompt(run.query.text, allowed)
@@ -130,8 +128,58 @@ class AdvisorAgent:
                         f"Requisito ignorado (cifra no presente en la consulta): {req.key}"
                     )
                     continue
-            kept.append(req.model_copy(update={"origin": req.origin}))
-        return parsed.model_copy(update={"original_text": run.query.text, "requirements": kept})
+            definition = keys[base_key(req.key)]
+            if definition.keywords and req.operator in (Operator.HAS, Operator.IN):
+                kept.extend(self._canonical_values(req, definition, run))
+                continue
+            kept.append(self._registry_operator(req, definition.comparison, run))
+        unique = list({(r.key, r.operator, str(r.value)): r for r in kept}.values())
+        return parsed.model_copy(update={"original_text": run.query.text, "requirements": unique})
+
+    @staticmethod
+    def _canonical_values(
+        req: TechnicalRequirement, definition: SpecDefinition, run: _Run
+    ) -> list[TechnicalRequirement]:
+        """Map free-text values ('humedad', ['gases volátiles']) to registry keywords.
+
+        HAS with a list becomes one HAS per item; IN keeps the (canonical) list. Values outside the
+        vocabulary are dropped with a warning instead of failing every candidate.
+        """
+        values = req.value if isinstance(req.value, list) else [req.value]
+        canonical: list[str] = []
+        for value in values:
+            if value == ANY:
+                canonical.append(ANY)
+                continue
+            keyword = definition.canonical(str(value))
+            if keyword is None:
+                run.warnings.append(
+                    f"Requisito ignorado (valor no reconocido para {req.key}): {value}"
+                )
+            elif keyword not in canonical:
+                canonical.append(keyword)
+        if req.operator is Operator.IN:
+            items = [v for v in canonical if v != ANY]
+            return [req.model_copy(update={"value": items})] if items else []
+        return [
+            TechnicalRequirement.model_validate({**req.model_dump(), "value": v}) for v in canonical
+        ]
+
+    @staticmethod
+    def _registry_operator(
+        req: TechnicalRequirement, comparison: str, run: _Run
+    ) -> TechnicalRequirement:
+        """Numeric capability keys compare as the registry says (gte/lte), never as EQ.
+
+        "100 Gigabit" means *at least* 100 Gb/s; an LLM returning EQ would silently turn faster,
+        compatible parts into failures.
+        """
+        if req.operator is not Operator.EQ or comparison not in ("gte", "lte"):
+            return req
+        operator = Operator.GTE if comparison == "gte" else Operator.LTE
+        symbol = "≥" if operator is Operator.GTE else "≤"
+        run.warnings.append(f"Se interpretó {req.key} = {req.value} como {symbol} {req.value}.")
+        return TechnicalRequirement.model_validate({**req.model_dump(), "operator": operator})
 
     def _resolve(self, parsed: ParsedQuery, run: _Run) -> list[PartMatch]:
         run.trace.append(AgentStep.RESOLVE)
@@ -311,3 +359,10 @@ class AdvisorAgent:
             text, provider = draft, "template"
         run.providers.append(provider)
         return text
+
+
+def _describe(key: str, definition: SpecDefinition) -> str:
+    """Key as shown to the NLU: unit, description and aliases, so the LLM picks the right one."""
+    hints = ", ".join(h for h in [definition.description, *definition.aliases][:4] if h)
+    unit = definition.unit or definition.type
+    return f"{key} ({unit}; {hints})" if hints else f"{key} ({unit})"

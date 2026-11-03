@@ -150,10 +150,18 @@ def write_manifest(root: Path, source: str, **counts: int) -> None:
     (root / MANIFEST_FILE).write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8")
 
 
+def _display_path(root: Path) -> str:
+    """Path shown in the UI: relative to the repo, never the user's home (CLAUDE.md rule 10)."""
+    try:
+        return root.resolve().relative_to(REPO_ROOT.resolve()).as_posix() + "/"
+    except ValueError:
+        return f"{root.name}/"
+
+
 def _source_label(root: Path) -> str:
     path = root / MANIFEST_FILE
     if not path.exists():
-        return f"artefactos en {root} (sin manifiesto de origen)"
+        return f"artefactos en {_display_path(root)} (sin manifiesto de origen)"
     manifest = json.loads(path.read_text(encoding="utf-8"))
     label = SOURCE_LABEL.get(manifest.get("source", ""), f"artefactos ({manifest.get('source')})")
     return f"{label}, generados {manifest.get('generated_at', '?')}"

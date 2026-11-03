@@ -168,7 +168,9 @@ BM25, repositorio local, golden set de 22 casos.
 7. Tests con `streamlit.testing.v1.AppTest`: caso oficial (orden MCX75310AAS-NEAT, BCM57508), aclaración, A100.
 - Aceptación: `make app` funciona sin red y con LLM template; tests verdes.
 
-### L4. Evaluación ciega y decisión UNKNOWN — rama `feat/eval-blind`
+### L4. ◐ Evaluación ciega y decisión UNKNOWN — rama `feat/eval-blind`
+> Hecho: `evaluation/blind_set.yaml` + `make eval-blind` + ADR-013 (Propuesto). **Pendiente (humano):** que alguien
+> del equipo escriba las 10 consultas ciegas sin ver el sistema; y acordar ADR-013 con Kevin (`contract-change`).
 1. Pide a alguien del equipo 10 consultas nuevas sin ver el sistema; añádelas como `GS-B01..B10` con `notes` y fuente.
 2. Corre `make eval`; documenta fallos en `evaluation/report.md` (no ajustar el sistema para "pasar" sin justificarlo).
 3. Propuesta para candidatos UNKNOWN (hoy al final de `recommendations`): o mantener, o moverlos a una lista nueva

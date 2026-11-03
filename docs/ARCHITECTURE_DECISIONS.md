@@ -45,3 +45,20 @@ igual en local y en Databricks. `ai_parse_document` se usa para datasheets y chu
 silver debe fallar si algún part number del catálogo no coincide literalmente con el de su datasheet.
 **Consecuencias:** el notebook de silver necesita `pdfplumber` en el entorno serverless (verificar `%pip install`
 con el egress de Free Edition en FEATURE_MATRIX); si no está disponible, se sube `silver.commercial` desde local.
+
+## ADR-013 Candidatos UNKNOWN fuera de `recommendations` (Propuesto — requiere `contract-change`)
+**Contexto:** hoy un candidato con nivel UNKNOWN (falta un dato crítico en su datasheet) aparece al final de
+`recommendations`, con su nivel visible en la UI. Caso real: Cortex-A78 → w9-3595X (el datasheet del Xeon no declara su
+arquitectura). La regla del producto dice que nunca se presenta una alternativa como técnicamente segura sin evidencia
+suficiente; aunque la UI lo etiqueta, estar en la lista de "recomendados" comunica más confianza de la que hay.
+
+**Opciones:**
+1. *Mantener* (sin cambio de contrato): UNKNOWN al final de `recommendations` con badge gris. Coste cero; riesgo de lectura.
+2. *Lista propia* `unverified_options: list[Recommendation]` en `RecommendationResponse` (validador: solo nivel UNKNOWN),
+   `rank` la llena, la UI la muestra como "Posibles, sin datos suficientes — requieren validación de un experto".
+3. *Ocultar* UNKNOWN: más simple pero pierde información útil para el experto.
+
+**Propuesta:** opción 2. Cambios: `models/recommendation.py` (campo + validadores; `recommendations` solo COMPATIBLE y
+COMPATIBLE_WITH_CONDITIONS), `recommendation/ranking.py` (`RankedOutput` con tercera lista), `agent` (pasa la lista),
+`app/components/render.py` (sección propia), `evaluation` (hit@1 ya ignora UNKNOWN), bump `CONTRACT_VERSION` a 1.1.0.
+**Estado:** pendiente de acuerdo con Kevin (PR `contract-change`).

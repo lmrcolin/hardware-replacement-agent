@@ -83,6 +83,7 @@ ignore_missing_imports = true
 # Mirrored by tests/contracts/test_imports.py so `pytest` alone also catches violations.
 [tool.importlinter]
 root_package = "advisor"
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Layered architecture"

@@ -4,8 +4,10 @@
 #   query: str                   customer text
 #   expected_original: str|null  part number the agent must resolve
 #   expected_status: ACTIVE|DISCONTINUED|EOL|NRND|null   from the catalog
-#   expected_top: list[str]      acceptable ACTIVE substitutes (any of them at rank 1 = hit@1)
+#   expected_top: list[str]      acceptable ACTIVE substitutes (any of them at rank 1 = hit@1);
+#                                [] = no substitute: hit if nothing is recommended as COMPATIBLE[_WITH_CONDITIONS]
 #   expected_level: COMPATIBLE|COMPATIBLE_WITH_CONDITIONS|UNKNOWN|INCOMPATIBLE|null
+#                                level of the rank-1 recommendation (INCOMPATIBLE when nothing is recommended)
 #   must_not_recommend: list[str]
 #   expect_clarification: bool
 #   verified_by: str|null        who checked it against the PDFs
@@ -14,10 +16,10 @@
 # Criterios:
 # - Estado, precio y stock: Catalogo_Comercial_Precios_Inventario_2026.pdf (32 PN: 21 ACTIVE, 6 DISCONTINUED, 2 EOL, 3 NRND).
 # - Specs: datasheet de cada PN en data/raw (citado en notes como archivo).
-# - expected_level solo se fija cuando las reglas de config/compat_rules.yaml lo determinan sin ambigüedad;
-#   si depende de una decisión de implementación (R-ELEC con TDP, R-FF con encapsulado) queda null y se explica en notes.
+# - expected_level sigue las decisiones del motor (config/spec_registry.yaml + compat_rules.yaml); queda null solo
+#   donde el caso necesita al agente (consultas sin part number, que pasan por NLU).
 # - must_not_recommend incluye siempre el propio original no ACTIVE.
-version: "0.2.0"
+version: "0.3.0"
 cases:
   # ---------------------------------------------------------------- Network
   - id: NET-E810-PN
@@ -82,17 +84,17 @@ cases:
     query: "¿Qué me recomiendas en lugar de la NVIDIA A100 80GB SXM4?"
     expected_original: A100-SXM4-80GB
     expected_status: NRND
-    expected_top: [H100-SXM5]
-    expected_level: null
-    must_not_recommend: [A100-SXM4-80GB, RTX-4090, MI300X]
+    expected_top: []
+    expected_level: INCOMPATIBLE
+    must_not_recommend: [A100-SXM4-80GB, H100-SXM5, RTX-4090, MI300X]
     expect_clarification: false
     verified_by: kevin
     notes: >-
-      NVIDIA_A100_80GB_GPU.pdf: 80 GB HBM2e, form factors SXM4 y PCIe, TDP 400W (SXM4) / 300W (PCIe); el datasheet indica
-      migración a H100. H100 (NVIDIA_H100_SXM5_GPU.pdf): 80 GB HBM3, SXM5 y PCIe, TDP 700W/350W. Coinciden en PCIe.
-      Nivel null: depende de R-ELEC (TDP del H100 > A100), decidir si eso es INCOMPATIBLE o condición de potencia/refrigeración.
-      RTX-4090: 24 GB < 80 GB (R-NUM-GTE) y sin NVLink. MI300X: form factor OAM (R-FF) y stack ROCm.
-      A100 es NRND: solo puede aparecer en risky_options, nunca en recommendations.
+      NVIDIA_A100_80GB_GPU.pdf: 80 GB HBM2e, form factors SXM4 y PCIe, TDP 400W (SXM4). La consulta pide SXM4:
+      H100 es SXM5 (otro zócalo/placa HGX) y además 700W, así que no es drop-in aunque el datasheet sugiera migrar.
+      RTX-4090: 24 GB < 80 GB y sin NVLink. MI300X: form factor OAM. Sin sustituto en el catálogo para SXM4.
+      Hallazgo: la A100 extrae form_factor "PCIe dual-slot" y la H100 "PCIe", y no hacen match; una A100 PCIe
+      tampoco recibiría al H100 PCIe. A100 es NRND: nunca en recommendations.
   - id: GPU-A100-REQ
     query: "Busco GPU de centro de datos con al menos 80 GB de memoria HBM y formato PCIe."
     expected_original: null
@@ -179,16 +181,16 @@ cases:
     query: "Necesito sustituir el ATSAMD21G18A en un diseño nuevo."
     expected_original: ATSAMD21G18A
     expected_status: DISCONTINUED
-    expected_top: [RP2040]
-    expected_level: null
-    must_not_recommend: [ATSAMD21G18A, ESP32-S3, STM32H743ZIT6]
+    expected_top: [RP2040, ESP32-S3]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
+    must_not_recommend: [ATSAMD21G18A]
     expect_clarification: false
     verified_by: kevin
     notes: >-
-      atsamd21-datasheet.pdf: Cortex-M0+ 48 MHz, 256 KB flash, 32 KB SRAM, USB device/host, 48-pin TQFP/QFN.
-      RP2040: 2x Cortex-M0+ (core crítico coincide), 264 KB SRAM, flash externa QSPI, USB device; encapsulado no declarado.
-      Nivel null: depende de R-FF con package ausente en RP2040 (MISSING => UNKNOWN) y de tratar la flash externa como condición.
-      ESP32-S3 (Xtensa LX7) y STM32H743 (Cortex-M7): core distinto => INCOMPATIBLE por regla crítica.
+      atsamd21-datasheet.pdf: Cortex-M0+ 48 MHz, 256 KB flash, 32 KB SRAM, USB, SERCOM como UART/SPI/I2C.
+      RP2040: 2x Cortex-M0+ (misma familia de núcleo), 264 KB SRAM, flash externa; su datasheet no declara UART/I2C.
+      ESP32-S3: Xtensa LX7 (core distinto = portar firmware, condición según spec_registry) pero declara UART/SPI/I2C.
+      Todas con condiciones. Hallazgo: el motor trata "2xCortexM0+" distinto de "CortexM0+" y penaliza a RP2040.
   - id: MCU-SAMD21-REQ
     query: "Microcontrolador Cortex-M0+ con USB y al menos 32 KB de SRAM."
     expected_original: null
@@ -206,14 +208,14 @@ cases:
     expected_original: XC7A200T
     expected_status: NRND
     expected_top: [AGFB014R24A]
-    expected_level: null
+    expected_level: COMPATIBLE_WITH_CONDITIONS
     must_not_recommend: [XC7A200T, ICE40UP5K]
     expect_clarification: false
     verified_by: kevin
     notes: >-
       xilinx-artix7-datasheet.pdf: 215,360 logic cells, 740 DSP, 500 I/O, 16 GTP a 6.6 Gb/s, BGA/CSG.
-      Agilex 7 AGFB014R24A: ~1.4 M logic elements, 624 I/O, package 2486A FBGA, otro fabricante y toolchain.
-      Nivel null: depende de R-FF (package distinto implica rediseño de placa). ICE40UP5K: 5,280 LUTs << 215,360.
+      Agilex 7 AGFB014R24A: ~1.4 M logic elements, package 2486A FBGA (rediseño de placa = condición), otro toolchain.
+      ICE40UP5K: 5,280 LUTs << 215,360.
 
   # --------------------------------------------------- sin sustituto válido
   - id: SENSOR-MPU6050-NONE
@@ -258,14 +260,14 @@ cases:
     expected_original: Cortex-A78
     expected_status: NRND
     expected_top: []
-    expected_level: null
-    must_not_recommend: [Cortex-A78, EPYC-9654, w9-3595X]
+    expected_level: UNKNOWN
+    must_not_recommend: [Cortex-A78]
     expect_clarification: false
     verified_by: kevin
     notes: >-
       arm-cortex-a78-trm.pdf: núcleo IP Armv8.2-A licenciable; Arm recomienda núcleos Armv9, que no están en el catálogo.
-      Los otros CPU (EPYC-9654, w9-3595X) son procesadores x86 con socket: no reemplazan un IP core.
-      Nivel null: según la implementación saldrá UNKNOWN (socket/tdp ausentes en A78) o INCOMPATIBLE (arquitectura).
+      EPYC-9654 y w9-3595X son procesadores x86 con socket: no reemplazan un IP core. El w9 no declara arquitectura,
+      por eso el motor lo deja en UNKNOWN; nunca debe salir como COMPATIBLE ni con condiciones.
 
   # ---------------------------------------------------------------- ambigua
   - id: AMBIGUOUS-01

@@ -118,6 +118,8 @@ def _numbers(text: str) -> set[str]:
         out.add(value)
         if "." in value:
             out.add(value.rstrip("0").rstrip("."))
+        if value.isdigit():  # "01" in 2025-08-01 is the same figure as "1 de agosto"
+            out.add(value.lstrip("0") or "0")
     return out
 
 

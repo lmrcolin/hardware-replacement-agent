@@ -26,9 +26,15 @@ from components.render import (
 from components.theme import CSS
 from mock_agent import MockAdvisorAgent
 
-from advisor.agent import Advisor
+from advisor.agent import Advisor, AdvisorAgent
 from advisor.models import Category, CustomerQuery, RecommendationResponse
-from advisor.pipeline import BuiltArtifacts, build_agent, load_or_build
+from advisor.pipeline import (
+    BuiltArtifacts,
+    build_agent,
+    evidence_sources,
+    load_or_build,
+    retrieval_status,
+)
 
 REAL, MOCK = "Real (catálogo + datasheets)", "Simulado (fixtures)"
 ALL = "Todas"
@@ -55,10 +61,17 @@ def get_agent(kind: str) -> Advisor:
     return MockAdvisorAgent() if kind == MOCK else build_agent(artifacts=get_artifacts())
 
 
+@st.cache_resource(show_spinner="Comprobando la búsqueda…")
+def get_retrieval_status(kind: str) -> str:
+    agent = get_agent(kind)
+    return retrieval_status(agent.retriever) if isinstance(agent, AdvisorAgent) else "fixtures"
+
+
 st.set_page_config(page_title="Emerson Replacement Advisor", page_icon="🔧", layout="wide")
 st.html(CSS)
 state = st.session_state
-history: list[tuple[str, RecommendationResponse]] = state.setdefault("history", [])
+# (consulta, respuesta, origen de la evidencia: "bm25 8, ai_search 8" o None)
+history: list[tuple[str, RecommendationResponse, str | None]] = state.setdefault("history", [])
 
 
 def ask(text: str | None = None) -> None:
@@ -130,7 +143,9 @@ names = get_artifacts().document_names if kind == REAL else {}
 pending = state.pop("pending", None)
 if pending:
     with main, st.spinner("Analizando compatibilidad…"):
-        history.append((pending, agent.answer(CustomerQuery(text=pending))))
+        response = agent.answer(CustomerQuery(text=pending))
+        found_by = evidence_sources(agent.retriever) if isinstance(agent, AdvisorAgent) else None
+        history.append((pending, response, found_by))
     state["active"] = len(history) - 1
     st.query_params["k"] = pending
 
@@ -176,6 +191,13 @@ with rail:
                 type="tertiary",
                 disabled=i == active,
             )
+    st.markdown('<div class="rail-title">Fuentes en uso</div>', unsafe_allow_html=True)
+    if isinstance(agent, AdvisorAgent):
+        st.caption(f"Datos: {get_artifacts().source}")
+        st.caption(f"Búsqueda: {get_retrieval_status(kind)}")
+        st.caption(f"LLM: {' → '.join(c.name for c in agent.llm_chain)}")
+    else:
+        st.caption("Datos: fixtures sintéticos (agente simulado)")
 
 # ---------------------------------------------------------------- results
 with main:
@@ -192,7 +214,7 @@ with main:
         if kind == REAL:
             replacement_tiles(get_artifacts().catalog, ask)
     else:
-        question, response = current
+        question, response, _ = current
         total = len(all_options(response))
         st.markdown(
             f'<div class="results-bar">{total} resultado{"s" * (total != 1)} para '
@@ -205,6 +227,8 @@ with main:
 # ---------------------------------------------------------------- footer
 trace = " → ".join(step.value for step in getattr(agent, "last_trace", []))
 provider = f"{current[1].llm_provider} · contrato {current[1].contract_version}" if current else "—"
+if current and current[2]:
+    provider += f" · evidencia recuperada por: {current[2]}"
 st.markdown(
     '<div class="backtop"><a href="#top">Volver arriba</a></div>'
     '<div class="footer"><b>Emerson Replacement Advisor</b> · Datathon MICAI 2026<br>'

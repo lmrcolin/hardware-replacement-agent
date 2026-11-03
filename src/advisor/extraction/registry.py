@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from pathlib import Path
 from typing import Literal
 
@@ -18,6 +19,12 @@ _DEFAULT_COMPARE: dict[str, Compare] = {
 }  # fmt: skip
 
 
+def fold(text: str) -> str:
+    """Lowercase without accents or extra spaces ('Gases Volátiles' -> 'gases volatiles')."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    return " ".join("".join(c for c in decomposed if not unicodedata.combining(c)).lower().split())
+
+
 class SpecDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -28,6 +35,8 @@ class SpecDefinition(BaseModel):
     aliases: list[str] = []
     patterns: list[str] = []
     keywords: list[str] = []
+    # canonical keyword -> es/en phrases meaning it in a query, e.g. humidity: [humedad]
+    synonyms: dict[str, list[str]] = {}
     compare: Compare | None = None
     derive: bool = True
     upgrade_condition: str | None = None
@@ -35,6 +44,20 @@ class SpecDefinition(BaseModel):
     @property
     def comparison(self) -> Compare:
         return self.compare or _DEFAULT_COMPARE[self.type]
+
+    def phrases(self) -> dict[str, list[str]]:
+        """Canonical keyword -> normalized phrases denoting it (keyword itself + synonyms)."""
+        return {
+            kw: [fold(kw), *(fold(s) for s in self.synonyms.get(kw, []))] for kw in self.keywords
+        }
+
+    def canonical(self, value: str) -> str | None:
+        """Registry keyword for a free-text value ('humedad' -> 'humidity'); None if unknown."""
+        wanted = fold(value)
+        for keyword, phrases in self.phrases().items():
+            if wanted in phrases:
+                return keyword
+        return None
 
     @field_validator("aliases")
     @classmethod
@@ -51,6 +74,10 @@ class SpecDefinition(BaseModel):
 
     @model_validator(mode="after")
     def _keywords_only_for_lists(self) -> SpecDefinition:
+        if set(self.synonyms) - set(self.keywords):
+            raise ValueError(
+                f"synonyms for unknown keywords: {set(self.synonyms) - set(self.keywords)}"
+            )
         if self.keywords and self.type != "list":
             raise ValueError("keywords are only valid for type 'list'")
         if self.type in ("number", "range") and not self.unit:

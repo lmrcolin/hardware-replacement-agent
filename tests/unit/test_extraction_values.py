@@ -90,3 +90,17 @@ def test_unit_tokens_belong_to_one_family() -> None:
 
     tokens = [t for units in _FAMILIES.values() for t in units]
     assert len(tokens) == len(set(tokens))
+
+
+def test_registry_synonyms_map_to_canonical_keywords() -> None:
+    from pathlib import Path
+
+    from advisor.extraction import load_spec_registry
+
+    registry = load_spec_registry(
+        Path(__file__).resolve().parents[2] / "config" / "spec_registry.yaml"
+    )
+    measurands = registry.categories["Sensor"]["measurands"]  # type: ignore[index]
+    assert measurands.canonical("Humedad") == "humidity"
+    assert measurands.canonical("gases volátiles") == "gas"
+    assert measurands.canonical("sabor") is None

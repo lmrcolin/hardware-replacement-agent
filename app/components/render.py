@@ -147,7 +147,7 @@ def replacement_tiles(
                     type="primary",
                     on_click=on_pick,
                     args=(f"Necesito reemplazar la {c.part_number}",),
-                    use_container_width=True,
+                    width="stretch",
                 )
 
 
@@ -249,7 +249,7 @@ def recommendation_card(
             ["Comparación de especificaciones", f"Evidencia ({len(rec.evidence)} citas)"]
         )
         with compare:
-            st.dataframe(comparison_table(rec), hide_index=True, use_container_width=True)
+            st.dataframe(comparison_table(rec), hide_index=True, width="stretch")
         with evidence:
             if not rec.evidence:
                 st.caption("Sin citas para este candidato.")

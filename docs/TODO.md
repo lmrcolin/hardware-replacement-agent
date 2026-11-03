@@ -88,8 +88,10 @@ BM25, repositorio local, golden set de 22 casos.
 
 ### K6. Notebook 06_export_artifacts (B-10)
 1. `CREATE VOLUME IF NOT EXISTS <catalog>.gold.artifacts`.
-2. Escribe con `LocalParquetRepository(Path("/Volumes/<catalog>/gold/artifacts"))`: `save_products`, `save_chunks`,
-   `save_compat_matrix`, y `advisor.kg.save(graph, .../graph.json)`.
+2. Lo más simple: `advisor.pipeline.export_artifacts(artifacts_dir=Path("/Volumes/<catalog>/gold/artifacts"))`
+   (ya implementado en L1: escribe `products.parquet`, `chunks.parquet`, `compat_matrix.parquet`, `graph.json` y
+   `documents.json` = document_id → nombre de PDF, para las citas). Si se escribe a mano: `LocalParquetRepository`
+   (`save_products`, `save_chunks`, `save_compat_matrix`) + `advisor.kg.save` + `documents.json`.
 3. Documenta en el notebook cómo bajarlos: `databricks fs cp -r dbfs:/Volumes/emerson_hw/gold/artifacts ./artifacts --profile lmrcolin`.
 - Aceptación: en local, `LocalParquetRepository(Path("artifacts")).load_products()` devuelve 32 productos tras copiar.
 
@@ -128,7 +130,7 @@ BM25, repositorio local, golden set de 22 casos.
 `README.md`, `docs/DEMO_PLAN.md`, `docs/COST_MODEL.md`, `tests/integration/**`, `scripts/smoke_tests.md`.
 **No tocar:** `databricks/**`, `databricks.yml`, `scripts/sql/**`, `src/advisor/repository/databricks_sql.py`, `docs/FEATURE_MATRIX.md`.
 
-### L1. `make pipeline-local` real — rama `feat/pipeline-local`
+### L1. ✅ `make pipeline-local` real — rama `feat/pipeline-local`
 1. En `src/advisor/pipeline.py` reemplaza los runners `NotImplementedError` por una ejecución real:
    `build_in_memory()` → matriz de compatibilidad (para cada no ACTIVE: `derive_requirements` + `evaluate` contra su
    categoría) → `LocalParquetRepository(artifacts_dir)`: `save_products`, `save_chunks`, `save_compat_matrix` y

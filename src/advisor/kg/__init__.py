@@ -1,1 +1,1 @@
-"""Knowledge graph (NetworkX): build, persist, resolve part numbers and expand candidate neighbours."""
+"""Knowledge graph (NetworkX): build, persist, resolve parts, expand candidates."""

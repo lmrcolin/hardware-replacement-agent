@@ -28,6 +28,8 @@ Las escribe el job `run_all` (`databricks.yml`) en serverless, entorno versión 
 Toda tabla silver/gold tiene `is_synthetic` y `_ingested_at` y `COMMENT`; se reescribe con
 `CREATE OR REPLACE TABLE ... AS SELECT * FROM read_files(<parquet en gold.artifacts/_delta/>)`, así que
 re-ejecutar no duplica filas. Columnas JSON = texto JSON del contrato correspondiente.
+`is_synthetic` = `true` solo para datos generados por el equipo (fixtures `SYN-*`); los 33 PDFs del reto
+son datos reales (`false`) en todas las capas, igual que `Product.is_synthetic`.
 
 | Tabla | Notebook | Filas | Clave | Columnas |
 |---|---|---|---|---|

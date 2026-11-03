@@ -29,4 +29,4 @@ description: Parses the commercial catalog and datasheets, extracts normalized P
 `tests/data/`: catálogo → 32 filas, estados 21/6/2/3 (ACTIVE/DISCONTINUED/EOL/NRND); 32 datasheets unidos; ninguna spec sin evidencia; `chunk_id` estable entre ejecuciones.
 
 ## Prohibido
-Inventar specs o rellenar por analogía; tomar estado/precio del datasheet; modificar `datos/pdfs/`; descargar modelos OCR sin autorización.
+Inventar specs o rellenar por analogía; tomar estado/precio del datasheet; modificar `data/raw/`; descargar modelos OCR sin autorización.

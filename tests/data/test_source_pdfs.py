@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 pytestmark = pytest.mark.data
-PDF_DIR = Path(__file__).resolve().parents[2] / "datos" / "pdfs"
+PDF_DIR = Path(__file__).resolve().parents[2] / "data" / "raw"
 
 
 def test_33_pdfs_present() -> None:

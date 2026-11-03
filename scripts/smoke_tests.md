@@ -3,10 +3,10 @@
 | # | Check | Comando / acción | Esperado | OK |
 |---|---|---|---|---|
 | 1 | Entorno | `make setup && make check` | contratos verdes, solo xfail de stubs pendientes | ☐ |
-| 2 | Datos locales | `ls datos/pdfs/*.pdf \| wc -l` | 33 | ☐ |
-| 3 | Bootstrap Databricks | `scripts/bootstrap_databricks.sh --profile emerson --dry-run` y luego sin `--dry-run` | volumen con 33 PDFs | ☐ |
-| 4 | Parse | notebook 02 (LIMIT 1) | salida de `ai_parse_document` no nula | ☐ |
-| 5 | Catálogo | `SELECT status, count(*) FROM datathon.emerson.silver_commercial GROUP BY 1` | ACTIVE 21 · DISCONTINUED 6 · EOL 2 · NRND 3 | ☐ |
+| 2 | Datos locales | `ls data/raw/*.pdf \| wc -l` | 33 | ☐ |
+| 3 | Bundle | `databricks bundle validate && databricks bundle deploy -t dev && databricks bundle run run_all -t dev` | job `run_all` OK | ☐ |
+| 4 | Parse | `SELECT count(*) FROM emerson_hw.bronze.documents_parsed` | 33 | ☐ |
+| 5 | Catálogo | `SELECT status, count(*) FROM emerson_hw.silver.commercial GROUP BY 1` | ACTIVE 21 · DISCONTINUED 6 · EOL 2 · NRND 3 | ☐ |
 | 6 | KG | `artifacts/graph.json` existe; nodos `product:*` = 32 | ☐ |
 | 7 | Caso oficial | app: consulta E810 (RDMA + IPsec) | E810-CQDA2 DISCONTINUED + sustituto ACTIVE con precio y stock del catálogo | ☐ |
 | 8 | Aclaración | app: "Necesito un reemplazo" | pregunta de aclaración | ☐ |

@@ -6,7 +6,7 @@ description: Implements and reviews the deterministic compatibility engine, YAML
 # Compatibility matching and ranking
 
 ## Alcance
-`src/advisor/{compatibility,recommendation,commercial}/`, `config/compat_rules.yaml`, notebook `06_compat_matrix`.
+`src/advisor/{compatibility,recommendation,commercial}/`, `config/compat_rules.yaml`, notebook `databricks/notebooks/05_compat_matrix.py`.
 
 ## Regla de oro
 Compatibilidad = reglas deterministas sobre specs con evidencia. **Nunca** por similitud semántica ni por opinión del LLM.

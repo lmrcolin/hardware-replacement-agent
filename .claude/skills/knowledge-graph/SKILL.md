@@ -6,7 +6,7 @@ description: Builds, persists and queries the NetworkX knowledge graph (nodes, t
 # Knowledge graph
 
 ## Alcance
-`src/advisor/kg/` (`build.py` y `query.py`), notebook `05_build_kg`, `tests/fixtures/mock_graph.json`.
+`src/advisor/kg/` (`build.py` y `query.py`), notebook `databricks/notebooks/04_build_kg.py`, `tests/fixtures/mock_graph.json`.
 
 ## Convenciones
 - `nx.MultiDiGraph`; `node_id` con prefijo de tipo: `product:E810-CQDA2`, `category:Network`, `protocol:RoCEv2`, `doc:<sha12>`, `chunk:<id>`.

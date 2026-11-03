@@ -21,9 +21,9 @@ Contratos Pydantic v2 en `src/advisor/models/` (`CONTRACT_VERSION = "1.0.0"`). C
 | `RuleResult` / `CompatibilityResult` | evaluación por regla / global | (`original`, `candidate`) |
 | `Recommendation` / `RecommendationResponse` | salida al usuario | — |
 
-## Tablas Delta (`datathon.emerson.*`)
-TODO: `bronze_documents`, `silver_parsed_pages`, `silver_products`, `silver_specs`, `silver_commercial`,
-`gold_products`, `gold_chunks`, `kg_nodes`, `kg_edges`, `compat_matrix`. Columnas = campos de los modelos.
+## Tablas Delta (`emerson_hw.<capa>.*`)
+Existe: `bronze.documents_parsed` (`databricks/notebooks/01_parse.py`). TODO: `silver.products`, `silver.product_specifications`, `silver.commercial`,
+`gold.products`, `gold.document_chunks`, `gold.kg_nodes`, `gold.kg_edges`, `gold.compat_matrix`. Columnas = campos de los modelos.
 
 ## Convenciones
 - Unidades canónicas por clave en `config/spec_registry.yaml`.

@@ -23,16 +23,17 @@ RetrieverBackend = Literal["bm25", "faiss", "hybrid", "ai_search"]
 
 
 class DatabricksSettings(BaseModel):
-    profile: str = "emerson"
-    catalog: str = "datathon"
-    schema_: str = Field(default="emerson", alias="schema")
-    volume: str = "raw"
-    volume_pdf_dir: str = "/Volumes/datathon/emerson/raw/pdfs"
+    profile: str | None = None  # None = CLI default profile (same as databricks.yml bundle)
+    catalog: str = "emerson_hw"  # bundle variable `catalog`
+    schema_bronze: str = "bronze"
+    schema_silver: str = "silver"
+    schema_gold: str = "gold"
+    volume_pdf_dir: str = "/Volumes/emerson_hw/bronze/raw_files"
     warehouse_id: str | None = None
 
 
 class PathSettings(BaseModel):
-    pdf_dir: Path = Path("datos/pdfs")
+    pdf_dir: Path = Path("data/raw")
     artifacts_dir: Path = Path("artifacts")
     spec_registry: Path = Path("config/spec_registry.yaml")
     compat_rules: Path = Path("config/compat_rules.yaml")

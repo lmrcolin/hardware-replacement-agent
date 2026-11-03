@@ -6,7 +6,7 @@
 - `feat/<tema>`, `fix/...`, `contract/...` → PR a `develop`.
 
 ## Commits
-Conventional Commits: `feat(compatibility): ...`, `fix(parsing): ...`, `chore`, `docs`, `test`, `build`.
+Conventional Commits con descripción en español en imperativo: `feat(compatibility): agrega regla R-CAT`, `fix(parsing): ...`, `chore`, `docs`, `test`, `build`.
 
 ## Organización
 - **Sin dueños por módulo:** cualquiera de los 3 puede editar cualquier archivo del repo.

@@ -17,7 +17,7 @@ R-NUM-GTE (numéricas mayor-o-igual), R-UPGRADE (mejora aceptable), R-MISSING (d
 ## Flujo
 1. `derive_requirements(original, parsed_query)` → `list[TechnicalRequirement]` (origen: QUERY, ORIGINAL_SPEC, CATEGORY_DEFAULT).
 2. `evaluate(original, candidate, requirements)` → `CompatibilityResult` con `RuleResult` por regla.
-3. Matriz 32×32 precalculada (notebook 06) para la demo.
+3. Matriz 32×32 precalculada (`databricks/notebooks/05_compat_matrix.py`) para la demo.
 
 ## Prohibiciones
 Sin LLM, sin retrieval, sin red. Similitud semántica nunca concede compatibilidad. Desconocido ≠ compatible.

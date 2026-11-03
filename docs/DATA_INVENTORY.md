@@ -1,6 +1,6 @@
-# Inventario de datos — `datos/pdfs/`
+# Inventario de datos — `data/raw/`
 
-Inspección: 2026-11-03. Los PDFs no se modifican; se movieron con `git mv` desde `data/raw/` (rename puro, hashes idénticos).
+Inspección: 2026-11-03. Los PDFs no se modifican; viven en `data/raw/`, ruta que usa `databricks/notebooks/00_setup.py` para copiarlos al volumen.
 
 ## Resumen
 
@@ -48,7 +48,7 @@ Inspección: 2026-11-03. Los PDFs no se modifican; se movieron con `git mv` desd
 
 ## Discrepancias y riesgos detectados
 
-1. **Ruta:** los PDFs estaban en `data/raw/`; el plan espera `datos/pdfs/`. Movidos.
+1. **Ruta:** el plan inicial pedía `datos/pdfs/`; se mantiene `data/raw/` porque el bundle de Databricks ya depende de ella.
 2. **Categorías en inglés** en el catálogo (`Memory`, `Network`, `Power`, `Sensor`, `Storage`, `Microcontroller`); el enum `Category` usa estos valores canónicos y la UI traduce.
 3. **Nombres de archivo heterogéneos** (guiones/guiones bajos, mayúsculas, sufijos `-data`, `-trm`); el join no puede basarse en el nombre del archivo: usar título del datasheet + rapidfuzz contra part number y descripción.
 4. **Datasheets de familia** (EPYC 9004, Agilex 7, iCE40, Artix-7, SAM D21): las specs pueden no ser del part number exacto → `Evidence` debe marcar `scope=family`.

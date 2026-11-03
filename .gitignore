@@ -22,7 +22,7 @@ htmlcov/
 *.pem
 *.key
 
-# Generated artifacts (rebuilt by `make pipeline-local` or notebook 07)
+# Generated artifacts (rebuilt by `make pipeline-local` or databricks/notebooks/06_export_artifacts.py)
 artifacts/*
 !artifacts/.gitkeep
 

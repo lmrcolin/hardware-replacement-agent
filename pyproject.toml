@@ -61,13 +61,16 @@ markers = [
     "contract: model and import-direction contracts (must always pass)",
     "stub: module contract not implemented yet (xfail until implemented)",
     "integration: multi-module tests over fixtures",
-    "data: tests over the real PDFs in datos/pdfs",
+    "data: tests over the real PDFs in data/raw",
 ]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["notebooks"]
+
+[tool.ruff.format]
+# Notebooks are formatted by their authors/Databricks; lint still applies.
+exclude = ["databricks/notebooks/*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]

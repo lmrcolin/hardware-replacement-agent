@@ -38,7 +38,7 @@ from advisor.repository import LocalParquetRepository
 from advisor.retrieval import BM25Retriever
 
 ROOT = Path(__file__).resolve().parents[2]
-PDF_DIR = ROOT / "datos" / "pdfs"
+PDF_DIR = ROOT / "data" / "raw"
 CATALOG = PDF_DIR / "Catalogo_Comercial_Precios_Inventario_2026.pdf"
 
 

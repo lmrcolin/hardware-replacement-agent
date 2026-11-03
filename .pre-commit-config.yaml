@@ -9,7 +9,7 @@ repos:
       - id: detect-private-key
       - id: check-added-large-files
         args: ["--maxkb=2048"]
-        exclude: ^datos/pdfs/
+        exclude: ^data/raw/
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.8.6

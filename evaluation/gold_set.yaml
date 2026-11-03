@@ -1,4 +1,4 @@
-# Gold set for `make eval`. Only VERIFIED cases against datos/pdfs belong here.
+# Gold set for `make eval`. Only VERIFIED cases against data/raw belong here.
 # Schema (validated by evaluation/run_eval.py):
 #   id: str                      unique case id
 #   query: str                   customer text

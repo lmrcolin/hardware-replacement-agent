@@ -17,6 +17,7 @@ Rellenar al probar cada capacidad en nuestro workspace. Nada se asume disponible
 | Entorno serverless por defecto vs. versión 4 | Kevinvlz | 2026-11-03 | OK con versión 4 | Por defecto: Python 3.11.10 (falla `advisor.llm`, genéricos PEP 695). Con `environments: [{spec: {environment_version: "4"}}]` + `environment_key` en la tarea de notebook: Python 3.12.3 |
 | Importar `advisor` desde la carpeta del repo (`/Workspace`, FUSE) | Kevinvlz | 2026-11-03 | FAIL | `OSError [Errno 5]` intermitente en `src/advisor/extraction/__init__.py` (mismo 403 de FUSE). Solución: wheel `emerson_advisor-*.whl` en el volumen `bronze.libs` + `%pip install --no-deps` |
 | `advisor` completo en serverless (wheel + config desde volumen) | Kevinvlz | 2026-11-03 | OK | `parse_catalog` 32 filas (21/6/2/3) con `H9HCNNNCPMML`; `build_in_memory` sobre `/Volumes/emerson_hw/bronze/raw_files`: 32 productos, 126 chunks, grafo 501/586 (igual que local). YAML de `config/` en `bronze.libs` |
+| Job `run_all` completo (00→06) en serverless, tareas 02-06 con `environment_version: "4"` | Kevinvlz | 2026-11-03 | OK | ~4.5 min. Wheel construido por el bundle (`artifacts`, `uv build`) y copiado a `bronze.libs` por 00_setup. Tablas silver/gold y artefactos en `gold.artifacts` idénticos al pipeline local (verificado con `DatabricksSQLRepository`) |
 | Databricks Apps | | | | ≤3, se paran a las 24 h |
 | Genie space sobre tablas gold | | | | opcional para la demo |
 | Descarga de modelos HF desde serverless (egress) | | | | ADR-007 |

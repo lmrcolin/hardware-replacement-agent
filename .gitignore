@@ -27,7 +27,7 @@ artifacts/*
 !artifacts/.gitkeep
 
 # Models / indexes downloaded at runtime
-models/
+/models/
 *.faiss
 .cache/
 

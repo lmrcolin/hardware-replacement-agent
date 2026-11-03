@@ -34,9 +34,15 @@ else:
           path                                                      AS _source_file,
           current_timestamp()                                       AS _ingested_at,
           uuid()                                                    AS _ingest_run_id,
-          true                                                      AS is_synthetic
+          false                                                     AS is_synthetic
         FROM read_files('{VOLUME_DIR}', format => 'binaryFile')
     """)
+
+# COMMAND ----------
+
+# is_synthetic = true solo para datos generados por el equipo (fixtures SYN-*); los PDFs del
+# reto son datos reales (false), como Product.is_synthetic. Corrige la tabla sin re-parsear.
+spark.sql(f"UPDATE {TABLE} SET is_synthetic = false WHERE is_synthetic")
 
 # COMMAND ----------
 

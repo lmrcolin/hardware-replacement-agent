@@ -12,7 +12,7 @@ from advisor.models import CommercialInformation, Product, RecommendationRespons
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures"
-PDF_DIR = ROOT / "datos" / "pdfs"
+PDF_DIR = ROOT / "data" / "raw"
 
 
 def _load(name: str) -> object:

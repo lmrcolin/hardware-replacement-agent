@@ -4,7 +4,7 @@ Rellenar al probar cada capacidad en nuestro workspace. Nada se asume disponible
 
 | Capacidad | Probado por | Fecha | OK/FAIL | Notas |
 |---|---|---|---|---|
-| `ai_parse_document` sobre `read_files(..., format => 'binaryFile')` | | | | notebook 02 |
+| `ai_parse_document` sobre `read_files(..., format => 'binaryFile')` | | | | `01_parse.py` |
 | `ai_query` con Llama 3.3 70B (`databricks-meta-llama-3-3-70b-instruct`) | | | | rate limits / cuota |
 | AI Search (Vector Search) endpoint + índice Delta Sync | | | | 1 endpoint, 1 unidad, sin Direct Vector Access |
 | Databricks Connect (serverless) desde local | | | | alternativa: SQL warehouse (ADR-009) |

@@ -221,7 +221,7 @@ class TestFixtures:
 class TestConfig:
     def test_settings_load(self) -> None:
         s = load_settings(ROOT / "config" / "settings.yaml")
-        assert s.databricks.volume_pdf_dir == "/Volumes/datathon/emerson/raw/pdfs"
+        assert s.databricks.volume_pdf_dir == "/Volumes/emerson_hw/bronze/raw_files"
         assert s.llm.providers[-1] == "template"
 
     def test_spec_registry_covers_all_categories(self) -> None:

@@ -1,14 +1,15 @@
 # Non-secret runtime settings. Environment overrides: ADVISOR_* (see .env.example).
 databricks:
-  profile: emerson
-  catalog: datathon
-  schema: emerson
-  volume: raw
-  volume_pdf_dir: /Volumes/datathon/emerson/raw/pdfs
+  profile: null                 # null = CLI default profile, same as `databricks bundle` (ADVISOR_DATABRICKS_PROFILE)
+  catalog: emerson_hw           # must match databricks.yml variable `catalog`
+  schema_bronze: bronze
+  schema_silver: silver
+  schema_gold: gold
+  volume_pdf_dir: /Volumes/emerson_hw/bronze/raw_files
   warehouse_id: null            # set via ADVISOR_DATABRICKS_WAREHOUSE_ID
 
 paths:
-  pdf_dir: datos/pdfs
+  pdf_dir: data/raw
   artifacts_dir: artifacts
   spec_registry: config/spec_registry.yaml
   compat_rules: config/compat_rules.yaml

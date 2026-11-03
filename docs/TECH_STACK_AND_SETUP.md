@@ -24,7 +24,9 @@ make app
 
 ## Databricks
 ```bash
-databricks auth login --host https://<workspace>.cloud.databricks.com --profile emerson
-scripts/bootstrap_databricks.sh --profile emerson
+databricks auth login --host https://<workspace>.cloud.databricks.com
+databricks bundle validate
+databricks bundle deploy -t dev
+databricks bundle run run_all -t dev      # 00_setup + 01_parse
 ```
 Nunca pegar tokens en el repo ni en el chat.

@@ -1,7 +1,7 @@
 UV ?= uv
 PROFILE ?= emerson
 
-.PHONY: help setup check lint imports typecheck test test-contracts pipeline-local eval app excel clean
+.PHONY: help setup install check lint format imports typecheck test test-contracts pipeline-local eval app excel clean
 
 help:
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -10,11 +10,18 @@ setup: ## Create .venv (Python 3.12), install deps and git hooks
 	$(UV) sync
 	$(UV) run pre-commit install
 
+install: setup ## Alias of setup
+
 check: lint imports test ## Lint + dependency contracts + tests (stubs xfail)
 
-lint: ## Ruff lint and format check
+lint: ## Ruff lint + format check + mypy strict
 	$(UV) run ruff check .
 	$(UV) run ruff format --check .
+	$(UV) run mypy src
+
+format: ## Auto-format and fix lint
+	$(UV) run ruff format .
+	$(UV) run ruff check --fix .
 
 imports: ## import-linter dependency direction
 	$(UV) run lint-imports
@@ -28,7 +35,7 @@ test: ## All tests
 test-contracts: ## Contract tests only
 	$(UV) run pytest tests/contracts
 
-pipeline-local: ## Build artifacts locally from datos/pdfs (stubs until implemented)
+pipeline-local: ## Build artifacts locally from data/raw (stubs until implemented)
 	$(UV) run advisor-pipeline
 
 eval: ## Run evaluation over evaluation/gold_set.yaml

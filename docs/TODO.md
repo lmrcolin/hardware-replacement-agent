@@ -8,12 +8,11 @@ Detalle y dependencias en [DEVELOPMENT_BACKLOG.md](DEVELOPMENT_BACKLOG.md).
 
 Primer comando:
 ```bash
-databricks auth login --host https://<workspace>.cloud.databricks.com --profile emerson
-scripts/bootstrap_databricks.sh --profile emerson --dry-run   # revisar, luego sin --dry-run
-# Ejecutar notebooks/00_bootstrap.sql, 01_ingest.py, 02_parse.sql en el workspace
+databricks auth login --host https://<workspace>.cloud.databricks.com
+databricks bundle deploy -t dev && databricks bundle run run_all -t dev
 ```
-- [ ] B-01 Notebook 00 + subir 33 PDFs al volumen
-- [ ] B-02 Notebooks 01–02 (`ai_parse_document`); anotar resultado en FEATURE_MATRIX.md
+- [x] B-01 `00_setup`: volumen + 33 PDFs (bundle `run_all`)
+- [ ] B-02 `01_parse`: confirmar 33 filas en `emerson_hw.bronze.documents_parsed`; anotar en FEATURE_MATRIX.md
 - [ ] B-03 `parse_catalog` → 32 filas (21/6/2/3)
 - [ ] B-04 `discover_documents` + `parse_document`
 - [ ] B-05 Completar `config/spec_registry.yaml` con claves reales

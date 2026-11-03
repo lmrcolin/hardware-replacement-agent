@@ -1,8 +1,8 @@
 # Architecture
 
 ```
-datos/pdfs ──► ingestion ──► parsing ──► extraction ──► enrichment(join catálogo) ──► chunking
-                 (UC volume /Volumes/datathon/emerson/raw/pdfs on Databricks)
+data/raw ──►  ingestion ──► parsing ──► extraction ──► enrichment(join catálogo) ──► chunking
+                 (UC volume /Volumes/emerson_hw/bronze/raw_files on Databricks)
                                                 │                         │
                                                 ▼                         ▼
                          Delta bronze/silver/gold (products, specs, commercial, chunks)
@@ -43,7 +43,7 @@ De arriba abajo (solo se importa hacia abajo; verificado por import-linter y `te
 `app/` solo importa `advisor.models`, `advisor.agent`, `advisor.repository`, `advisor.config`.
 
 ## Ejecución
-- **Databricks (Free Edition):** notebooks 00–07 construyen Delta + artefactos; consultas acotadas e idempotentes.
-- **Local:** `make pipeline-local` produce los mismos artefactos desde `datos/pdfs/`; la app solo lee artefactos.
+- **Databricks (Free Edition):** bundle `databricks.yml` (job `run_all`) y notebooks `databricks/notebooks/00–06` construyen Delta + artefactos; consultas acotadas e idempotentes.
+- **Local:** `make pipeline-local` produce los mismos artefactos desde `data/raw/`; la app solo lee artefactos.
 
 Detalles: [MODULE_CONTRACTS.md](MODULE_CONTRACTS.md), [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md).

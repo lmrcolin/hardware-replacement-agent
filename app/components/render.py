@@ -1,14 +1,14 @@
-"""Presentation components. They only read RecommendationResponse; no business logic here.
+"""Presentation components for the agent chat.
 
-Marketplace layout: product cards with a "buy box" column (price, stock, status), tabs for the
-spec comparison and the cited evidence. Order and sections come from the engine unchanged:
-filters only hide cards, they never re-rank or move a card between sections.
+They only read RecommendationResponse and the agent's own trace; no business logic here.
+Levels, ranking and sections come from the agent untouched.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+import re
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from html import escape
 
@@ -24,6 +24,7 @@ from advisor.models import (
     Recommendation,
     RecommendationResponse,
     RuleOutcome,
+    TechnicalRequirement,
 )
 from components.images import image_html
 
@@ -32,12 +33,6 @@ LEVEL_BADGE = {
     CompatibilityLevel.COMPATIBLE_WITH_CONDITIONS: ":orange-badge[Compatible con condiciones]",
     CompatibilityLevel.UNKNOWN: ":gray-badge[No confirmada: faltan datos críticos]",
     CompatibilityLevel.INCOMPATIBLE: ":red-badge[Incompatible]",
-}
-LEVEL_LABEL = {
-    CompatibilityLevel.COMPATIBLE: "Compatible",
-    CompatibilityLevel.COMPATIBLE_WITH_CONDITIONS: "Con condiciones",
-    CompatibilityLevel.UNKNOWN: "Sin datos suficientes",
-    CompatibilityLevel.INCOMPATIBLE: "Incompatible",
 }
 STATUS_BADGE = {
     CommercialStatus.ACTIVE: ":green-badge[ACTIVE]",
@@ -64,6 +59,26 @@ CATEGORY_LABEL = {
     Category.STORAGE: "Almacenamiento",
 }
 REPLACE = (CommercialStatus.DISCONTINUED, CommercialStatus.EOL, CommercialStatus.NRND)
+INTENT_LABEL = {
+    "replace": "reemplazar una pieza",
+    "find": "buscar por requisitos",
+    "status": "consultar estado",
+    "other": "otra",
+}
+OPERATOR_LABEL = {"GTE": "≥", "LTE": "≤", "EQ": "=", "IN": "∈", "HAS": "incluye"}
+
+# What each AgentStep means, in the customer's language.
+STEP_TITLE = {
+    "PARSE": "Interpretar la consulta",
+    "RESOLVE": "Identificar la pieza en el grafo",
+    "CLARIFY": "Pedir una aclaración",
+    "STATUS": "Consultar el catálogo",
+    "DISCOVER": "Buscar candidatos",
+    "VALIDATE": "Validar compatibilidad con reglas",
+    "RANK": "Ordenar resultados",
+    "COMPOSE": "Redactar la respuesta",
+    "VERIFY": "Verificar cifras del texto",
+}
 
 
 def _html(markup: str) -> None:
@@ -80,112 +95,170 @@ def _fmt(value: object) -> str:
     return str(value)
 
 
-def price_html(c: CommercialInformation) -> str:
-    """Price only for ACTIVE parts (catalog rule); cents as superscript."""
+def price_text(c: CommercialInformation) -> str:
+    """Price only for ACTIVE parts (catalog rule)."""
     if c.status is not CommercialStatus.ACTIVE or c.price_usd is None:
-        return '<div class="no-price">Sin precio de venta vigente</div>'
-    units, cents = f"{Decimal(c.price_usd):,.2f}".split(".")
-    return f'<div class="price"><sup>US$</sup>{units}<sup>{cents}</sup></div>'
+        return "Sin precio de venta vigente"
+    return f"US$ {Decimal(c.price_usd):,.2f}"
 
 
-def stock_html(c: CommercialInformation) -> str:
+def stock_text(c: CommercialInformation) -> str:
     if c.stock_units is None:
-        return '<div class="muted">Stock no informado en el catálogo</div>'
+        return "Stock no informado"
     if c.stock_units == 0:
-        return '<div class="stock-out">Sin stock</div>'
-    return f'<div class="stock-in">En stock: {c.stock_units:,} unidades</div>'
-
-
-# ---------------------------------------------------------------- landing
-
-
-def replacement_tiles(
-    products: Iterable[Product], on_pick: Callable[[str], None], *, per_row: int = 4
-) -> None:
-    """Catalog parts that need a replacement (DISCONTINUED/EOL/NRND) as clickable tiles."""
-    parts = sorted(
-        (
-            (REPLACE.index(p.commercial.status), p.category.value, p.part_number, p)
-            for p in products
-            if p.commercial and p.commercial.status in REPLACE
-        ),
-        key=lambda row: row[:3],
-    )
-    if not parts:
-        return
-    _html('<div class="band">Piezas del catálogo que necesitan reemplazo</div>')
-    st.caption(f"{len(parts)} piezas DISCONTINUED, EOL o NRND · elige una para buscar sustituto")
-    for start in range(0, len(parts), per_row):
-        cols = st.columns(per_row)
-        for col, (*_, product) in zip(cols, parts[start : start + per_row], strict=False):
-            c = product.commercial
-            assert c is not None
-            with col, st.container(key=f"tile-{c.part_number}"):
-                _html(image_html(product, css_class="pimg pimg-tile"))
-                _html(
-                    f'<span class="status-red">{c.status.value}</span> '
-                    f'<span class="muted">· {escape(CATEGORY_LABEL[c.category])}</span>'
-                )
-                _html(
-                    f"<b>{escape(c.part_number)}</b><br><span class='muted'>"
-                    f"{escape(c.description)} · {escape(c.manufacturer)}</span>"
-                )
-                st.button(
-                    "Buscar sustituto",
-                    key=f"pick-{c.part_number}",
-                    type="primary",
-                    on_click=on_pick,
-                    args=(f"Necesito reemplazar la {c.part_number}",),
-                    width="stretch",
-                )
-
-
-# ---------------------------------------------------------------- results
-
-
-@dataclass(frozen=True)
-class Filters:
-    """Display-only filters chosen in the left rail; empty means 'all'."""
-
-    category: Category | None = None
-    levels: frozenset[CompatibilityLevel] = field(default_factory=frozenset)
-    manufacturers: frozenset[str] = field(default_factory=frozenset)
-
-    def keep(self, rec: Recommendation) -> bool:
-        return (
-            (self.category is None or rec.commercial.category is self.category)
-            and (not self.levels or rec.compatibility.level in self.levels)
-            and (not self.manufacturers or rec.commercial.manufacturer in self.manufacturers)
-        )
+        return "Sin stock"
+    return f"{c.stock_units:,} unidades"
 
 
 def all_options(response: RecommendationResponse) -> list[Recommendation]:
     return response.recommendations + response.risky_options + response.unverified_options
 
 
+def parts_to_replace(products: Iterable[Product]) -> list[Product]:
+    """Catalog parts in DISCONTINUED/EOL/NRND, most urgent first."""
+    rows = [
+        (REPLACE.index(p.commercial.status), p.category.value, p.part_number, p)
+        for p in products
+        if p.commercial is not None and p.commercial.status in REPLACE
+    ]
+    return [row[-1] for row in sorted(rows, key=lambda r: r[:3])]
+
+
+# ---------------------------------------------------------------- agent reasoning
+
+
+@dataclass(frozen=True)
+class Step:
+    key: str
+    title: str
+    detail: str
+
+
+def _requirement(req: TechnicalRequirement) -> str:
+    unit = "" if not req.unit or req.unit == "count" else f" {req.unit}"
+    op = OPERATOR_LABEL.get(req.operator.value, req.operator.value)
+    return f"{req.key} {op} {_fmt(req.value)}{unit}"
+
+
+def providers(response: RecommendationResponse) -> tuple[str, str]:
+    """(NLU provider, NLG provider) as recorded by the agent in ``llm_provider``."""
+    names = [p for p in response.llm_provider.split("+") if p]
+    return (names[0], names[-1]) if names else ("—", "—")
+
+
+def reasoning(
+    response: RecommendationResponse,
+    trace: Sequence[str],
+    *,
+    retrieval: str | None = None,
+    found_by: str | None = None,
+) -> list[Step]:
+    """One human-readable line per step the agent actually ran, built from its own outputs."""
+    nlu, nlg = providers(response)
+    parsed, original = response.parsed_query, response.original
+    steps: list[Step] = []
+    for key in trace:
+        detail = ""
+        if key == "PARSE" and parsed is not None:
+            reqs = "; ".join(_requirement(r) for r in parsed.requirements) or "ninguno"
+            category = CATEGORY_LABEL[parsed.category] if parsed.category else "—"
+            detail = (
+                f"Modelo: {nlu} · intención: {INTENT_LABEL.get(parsed.intent, parsed.intent)} · "
+                f"categoría: {category} · part numbers: {', '.join(parsed.part_numbers) or '—'} · "
+                f"requisitos: {reqs}."
+            )
+        elif key == "RESOLVE":
+            if original is not None:
+                detail = f"Coincidencia segura en el catálogo: {original.part_number}."
+            elif response.clarification_question:
+                detail = "Sin coincidencia segura con un part number del catálogo."
+            else:
+                detail = "Sin part number en la consulta: se busca por requisitos."
+        elif key == "CLARIFY":
+            detail = response.clarification_question or "Falta un dato para continuar."
+        elif key == "STATUS" and original is not None and original.commercial is not None:
+            c = original.commercial
+            since = f" desde {c.discontinued_on.isoformat()}" if c.discontinued_on else ""
+            detail = (
+                f"{original.part_number}: {c.status.value}{since}. "
+                "El catálogo es la fuente de verdad para estado, precio y stock."
+            )
+        elif key == "DISCOVER":
+            detail = "Misma categoría, vecinos del grafo de conocimiento y búsqueda documental"
+            detail += f" ({retrieval})" if retrieval else ""
+            detail += f"; evidencia hallada por: {found_by}." if found_by else "."
+        elif key == "VALIDATE":
+            detail = (
+                f"Reglas deterministas: {len(response.recommendations)} recomendado(s), "
+                f"{len(response.risky_options)} con riesgo (NRND), "
+                f"{len(response.unverified_options)} sin datos suficientes. Los incompatibles se "
+                "descartan y un dato faltante nunca cuenta como compatible."
+            )
+        elif key == "RANK":
+            detail = (
+                "Nivel de compatibilidad, luego cobertura de requisitos obligatorios, "
+                "luego puntuación; "
+                "el stock solo desempata."
+            )
+        elif key == "COMPOSE":
+            detail = f"Modelo: {nlg}. Solo redacta con cifras de la respuesta estructurada."
+        elif key == "VERIFY":
+            replaced = any("datos no verificados" in w for w in response.warnings)
+            detail = (
+                "El texto generado traía datos no verificados: se muestra la versión verificada."
+                if replaced
+                else "Cada cifra y part number del texto coincide con los datos estructurados."
+            )
+        steps.append(Step(key, STEP_TITLE.get(key, key), detail))
+    return steps
+
+
+def reasoning_view(steps: Sequence[Step], response: RecommendationResponse) -> None:
+    nlu, nlg = providers(response)
+    llm = nlu if nlu == nlg else f"{nlu} → {nlg}"
+    label = f"Razonamiento del agente · {len(steps)} pasos · LLM: {llm}"
+    with st.status(label, state="complete", expanded=False):
+        items = "".join(
+            f'<li><span class="step-key">{escape(s.key)}</span> <b>{escape(s.title)}</b>'
+            f'<div class="step-detail">{escape(s.detail)}</div></li>'
+            for s in steps
+        )
+        _html(f'<ol class="steps">{items}</ol>')
+
+
+def clarification_options(question: str | None, known: Iterable[str]) -> list[str]:
+    """Catalog part numbers the agent offered in its clarification question, in order of mention."""
+    if not question:
+        return []
+    hits: dict[str, int] = {}
+    for pn in sorted(set(known), key=len, reverse=True):
+        match = re.search(rf"(?<![\w-]){re.escape(pn)}(?![\w-])", question)
+        if match and not any(pn in other for other in hits):
+            hits[pn] = match.start()
+    return sorted(hits, key=hits.__getitem__)
+
+
+# ---------------------------------------------------------------- result cards
+
+
 def original_card(product: Product) -> None:
     c = product.commercial
-    with st.container(key="original"):
-        left, mid, right = st.columns([1, 5, 2.2])
+    with st.container(key="card-original"):
+        left, right = st.columns([1, 6])
         left.markdown(image_html(product), unsafe_allow_html=True)
-        with mid:
-            st.markdown(f"#### Pieza original: {product.part_number}")
+        with right:
+            st.markdown(f"**Pieza original: {product.part_number}**")
             if c is None:
                 st.caption("Sin información comercial en el catálogo.")
                 return
             st.markdown(f"{STATUS_BADGE[c.status]} · {c.description} · {c.manufacturer}")
-            st.caption(f"Categoría: {CATEGORY_LABEL[c.category]}")
-        with right:
             since = c.discontinued_on.isoformat() if c.discontinued_on else "—"
             last = c.last_buy_on.isoformat() if c.last_buy_on else "—"
-            since_label = (
-                "NRND desde" if c.status is CommercialStatus.NRND else "Descontinuada desde"
+            label = "NRND desde" if c.status is CommercialStatus.NRND else "Descontinuada desde"
+            st.caption(
+                f"{CATEGORY_LABEL[c.category]} · {label}: {since} · última compra: {last} · "
+                f"stock: {stock_text(c)}"
             )
-            _html(
-                f'<div class="muted">{since_label}</div><b>{since}</b>'
-                f'<div class="muted" style="margin-top:6px">Última compra</div><b>{last}</b>'
-            )
-            _html(stock_html(c))
 
 
 def comparison_table(rec: Recommendation) -> pd.DataFrame:
@@ -207,23 +280,15 @@ def comparison_table(rec: Recommendation) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def recommendation_card(
-    rec: Recommendation, names: dict[str, str], *, key: str, best: bool = False
-) -> None:
+def recommendation_card(rec: Recommendation, names: dict[str, str], *, key: str) -> None:
     c = rec.commercial
     with st.container(key=f"card-{key}"):
-        left, mid, right = st.columns([1, 4.6, 1.8])
+        left, mid, right = st.columns([1, 4.2, 1.7])
         left.markdown(image_html(rec.product), unsafe_allow_html=True)
         with mid:
-            if best:
-                _html('<div class="choice">Mejor <span>compatibilidad</span></div>')
             st.subheader(f"{rec.rank}. {rec.product.part_number}", anchor=False)
-            st.markdown(f"{c.description} · de **{c.manufacturer}**")
-            st.markdown(LEVEL_BADGE[rec.compatibility.level])
-            coverage = rec.compatibility.coverage
-            _html(
-                f'<div class="coverage"><div style="width:{coverage:.0%}"></div></div>'
-                f'<div class="muted">Requisitos obligatorios cubiertos: {coverage:.0%}</div>'
+            st.markdown(
+                f"{LEVEL_BADGE[rec.compatibility.level]} · {c.description} · {c.manufacturer}"
             )
             st.write(rec.rationale)
             if rec.compatibility.conditions:
@@ -231,8 +296,12 @@ def recommendation_card(
                     "**Condiciones**\n" + "\n".join(f"- {x}" for x in rec.compatibility.conditions)
                 )
         with right:
-            _html(price_html(c))
-            _html(stock_html(c))
+            _html(
+                f'<div class="fact"><span>Precio (catálogo)</span><b>{escape(price_text(c))}</b>'
+                f'</div><div class="fact"><span>Stock</span><b>{escape(stock_text(c))}</b></div>'
+                f'<div class="fact"><span>Requisitos obligatorios</span>'
+                f"<b>{rec.compatibility.coverage:.0%} cubiertos</b></div>"
+            )
             st.markdown(STATUS_BADGE[c.status])
         compare, evidence = st.tabs(
             ["Comparación de especificaciones", f"Evidencia ({len(rec.evidence)} citas)"]
@@ -265,71 +334,43 @@ def expert_summary(response: RecommendationResponse) -> str:
     return "\n".join(lines)
 
 
-def _section(
-    title: str,
-    recs: list[Recommendation],
-    names: dict[str, str],
-    filters: Filters,
-    *,
-    key: str,
-    note: str | None = None,
-    note_class: str = "band-warn",
-    best_first: bool = False,
-) -> None:
-    shown = [r for r in recs if filters.keep(r)]
-    if not recs:
-        return
-    _html(f'<div class="band">{escape(title)}</div>')
-    if note:
-        _html(f'<div class="{note_class}">{escape(note)}</div>')
-    if len(shown) < len(recs):
-        st.caption(f"{len(recs) - len(shown)} de {len(recs)} ocultas por los filtros.")
-    for rec in shown:
-        best = best_first and rec is recs[0]
-        recommendation_card(rec, names, key=f"{key}-{rec.rank}", best=best)
-
-
-def response_view(
-    response: RecommendationResponse, names: dict[str, str], filters: Filters | None = None
-) -> None:
-    filters = filters or Filters()
+def response_view(response: RecommendationResponse, names: dict[str, str], *, turn: int) -> None:
+    """The agent's answer: its message first, then the structured result it is based on."""
     if response.is_synthetic:
         st.warning("Respuesta generada con datos sintéticos de prueba.")
     if response.clarification_question:
         st.info(response.clarification_question)
         return
+    st.markdown(response.message.replace("\n", "  \n"))
     if response.original is not None:
         original_card(response.original)
-    with st.container(key="card-summary"):
-        _html('<div class="muted">Resumen del asesor</div>')
-        st.markdown(response.message.replace("\n", "  \n"))
-    _section(
-        "Sustitutos recomendados" if response.original else "Productos que cumplen",
-        response.recommendations,
-        names,
-        filters,
-        key="rec",
-        best_first=True,
-    )
-    _section(
-        "Opciones con riesgo (NRND)",
-        response.risky_options,
-        names,
-        filters,
-        key="risk",
-        note="Siguen en inventario pero no se recomiendan para nuevos diseños; "
-        "sin precio de venta vigente.",
-    )
-    _section(
-        "Posibles, sin datos suficientes",
-        response.unverified_options,
-        names,
-        filters,
-        key="unv",
-        note="Su datasheet no declara algún dato crítico: la compatibilidad no está confirmada y "
-        "requiere validación de un experto. No se presentan como recomendados.",
-        note_class="band-gray",
-    )
+    if response.recommendations:
+        title = "Sustitutos recomendados" if response.original else "Productos que cumplen"
+        st.markdown(f"##### {title}")
+        for rec in response.recommendations:
+            recommendation_card(rec, names, key=f"{turn}-rec-{rec.rank}")
+    open_caveats = not response.recommendations
+    if response.risky_options:
+        with st.expander(
+            f"Opciones con riesgo (NRND) · {len(response.risky_options)}", expanded=open_caveats
+        ):
+            st.caption(
+                "Siguen en inventario pero no se recomiendan para nuevos diseños; "
+                "sin precio de venta vigente."
+            )
+            for rec in response.risky_options:
+                recommendation_card(rec, names, key=f"{turn}-risk-{rec.rank}")
+    if response.unverified_options:
+        with st.expander(
+            f"Posibles, sin datos suficientes · {len(response.unverified_options)}",
+            expanded=open_caveats,
+        ):
+            st.caption(
+                "Su datasheet no declara algún dato crítico: la compatibilidad no está "
+                "confirmada y requiere validación de un experto. No se presentan como recomendados."
+            )
+            for rec in response.unverified_options:
+                recommendation_card(rec, names, key=f"{turn}-unv-{rec.rank}")
     for warning in response.warnings:
         st.caption(f"Aviso: {warning}")
     with st.expander("Escalar a un experto"):

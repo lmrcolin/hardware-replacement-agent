@@ -212,7 +212,7 @@ with main:
             "o elige un ejemplo."
         )
         if kind == REAL:
-            replacement_tiles(get_artifacts().catalog, ask)
+            replacement_tiles(get_artifacts().products, ask)
     else:
         question, response, _ = current
         total = len(all_options(response))

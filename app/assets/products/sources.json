@@ -1,0 +1,92 @@
+{
+  "RTX-4090": {
+    "file": "RTX-4090.jpg",
+    "commons_title": "File:Asus Strix RTX 4090.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Asus_Strix_RTX_4090.jpg",
+    "author": "Benlisquare",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "exact": true,
+    "note": "tarjeta ASUS ROG Strix con GPU RTX 4090"
+  },
+  "RP2040": {
+    "file": "RP2040.jpg",
+    "commons_title": "File:26191-Raspberry-Pi-RP2040-MCU-Front.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:26191-Raspberry-Pi-RP2040-MCU-Front.jpg",
+    "author": "SparkFun Electronics",
+    "license": "CC BY 2.0",
+    "license_url": "https://creativecommons.org/licenses/by/2.0",
+    "exact": true,
+    "note": ""
+  },
+  "ESP32-S3": {
+    "file": "ESP32-S3.jpg",
+    "commons_title": "File:ESP32-S3 on paper.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:ESP32-S3_on_paper.jpg",
+    "author": "VectorVoyager",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "exact": true,
+    "note": "placa de desarrollo con el ESP32-S3"
+  },
+  "MPU-6050": {
+    "file": "MPU-6050.jpg",
+    "commons_title": "File:IvenSense 3-Axis-Gyro-Accelerometer-IC MPU-6050 10937-01.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:IvenSense_3-Axis-Gyro-Accelerometer-IC_MPU-6050_10937-01.jpg",
+    "author": "SparkFun",
+    "license": "CC BY 2.0",
+    "license_url": "https://creativecommons.org/licenses/by/2.0",
+    "exact": true,
+    "note": ""
+  },
+  "MZ-V9P2T0": {
+    "file": "MZ-V9P2T0.jpg",
+    "commons_title": "File:SAMSUNG M.2 NVMe SSD 990 PRO 4TB.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:SAMSUNG_M.2_NVMe_SSD_990_PRO_4TB.jpg",
+    "author": "Dinkun Chen",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "exact": false,
+    "note": "misma línea 990 PRO, versión de 4 TB"
+  },
+  "XC7A200T": {
+    "file": "XC7A200T.jpg",
+    "commons_title": "File:Xilinx Artix7 XC7A100T FGG484 on PCB.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Xilinx_Artix7_XC7A100T_FGG484_on_PCB.jpg",
+    "author": "S03311251",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "exact": false,
+    "note": "misma familia Artix-7 (XC7A100T)"
+  },
+  "STM32H743ZIT6": {
+    "file": "STM32H743ZIT6.jpg",
+    "commons_title": "File:STM32H7B0.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:STM32H7B0.jpg",
+    "author": "Giansi80",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "exact": false,
+    "note": "misma familia STM32H7 (STM32H7B0)"
+  },
+  "MT60B4G8HB-48B": {
+    "file": "MT60B4G8HB-48B.jpg",
+    "commons_title": "File:Micron 32 GB DDR5-5600 SO-DIMM - front view.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Micron_32_GB_DDR5-5600_SO-DIMM_-_front_view.jpg",
+    "author": "ITEagle Europe - Sebastiaan Broekhoven",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "exact": false,
+    "note": "módulo SO-DIMM con chips DDR5 de Micron"
+  },
+  "TPS65982AB": {
+    "file": "TPS65982AB.jpg",
+    "commons_title": "File:Dell WD15 (model K17A) - board - Texas Instruments TPS65982-2829.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Dell_WD15_(model_K17A)_-_board_-_Texas_Instruments_TPS65982-2829.jpg",
+    "author": "Raimond Spekking",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+    "exact": true,
+    "note": "chip montado en una placa Dell WD15"
+  }
+}

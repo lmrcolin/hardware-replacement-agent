@@ -36,11 +36,11 @@ categories:
                      description: "ISA/microarchitecture: ARM vs x86 is never a drop-in replacement"}
 
   DAQ:
-    analog_inputs:  {unit: count, type: number, critical: true, aliases: [channels], patterns: ['(\d+) single-ended']}
+    analog_inputs:  {unit: count, type: number, critical: true, aliases: [channels], description: "canales / entradas analógicas", patterns: ['(\d+) single-ended']}
     resolution:     {unit: bit, type: number, critical: true, aliases: [resolution]}
-    sample_rate:    {unit: S/s, type: number, critical: true, aliases: [rate, maximum sampling rate, maximum sample rate]}
-    analog_outputs: {unit: count, type: number, aliases: [ao], patterns: ['(\w+) (?:\d+-bit )?analog outputs']}
-    digital_io:     {unit: count, type: number, aliases: [dio], patterns: ['(\d+) digital I/O']}
+    sample_rate:    {unit: S/s, type: number, critical: true, description: "velocidad de muestreo", aliases: [rate, maximum sampling rate, maximum sample rate]}
+    analog_outputs: {unit: count, type: number, aliases: [ao], description: "salidas analógicas", patterns: ['(\w+) (?:\d+-bit )?analog outputs']}
+    digital_io:     {unit: count, type: number, aliases: [dio], description: "líneas digitales de E/S (no son canales analógicos)", patterns: ['(\d+) digital I/O']}
     counters:       {unit: count, type: number, aliases: [counters], patterns: ['(\w+) (?:\d+-bit )?counter']}
     host_interface: {type: string, critical: true, compare: interface, aliases: [interface], patterns: ['(USB \d\.\d)']}
     simultaneous:   {type: boolean, aliases: [simultaneous]}
@@ -84,7 +84,8 @@ categories:
     sram:           {unit: KB, type: number, critical: true, aliases: [sram]}
     gpio:           {unit: count, type: number, aliases: [gpio]}
     usb:            {type: string, aliases: [usb]}
-    wireless:       {type: list, keywords: [Wi-Fi, Bluetooth]}
+    wireless:       {type: list, keywords: [Wi-Fi, Bluetooth],
+                     synonyms: {Wi-Fi: [wifi, wi fi, wlan, '802.11'], Bluetooth: [ble, bluetooth le]}}
     interfaces:     {type: list, keywords: [UART, SPI, I2C, I2S, CAN, FDCAN, Ethernet]}
     supply_voltage: {unit: V, type: range, aliases: [supply], description: "Only stated by some datasheets"}
     package:        {type: string, aliases: [package]}
@@ -95,8 +96,9 @@ categories:
     ports:          {unit: count, type: number, aliases: [ports]}
     host_interface: {type: string, critical: true, compare: interface, aliases: [pcie, host interface], patterns: ['(PCIe \d\.\d x\d+) host interface']}
     sriov_vfs:      {unit: count, type: number, aliases: [sriov, sr-iov]}
-    rdma:           {type: list, keywords: [RoCE v2, iWARP, InfiniBand]}
-    offloads:       {type: list, keywords: [IPsec, TLS, VXLAN, GENEVE, NVGRE, GRE, OVS, NVMe-oF]}
+    rdma:           {type: list, keywords: [RoCE v2, iWARP, InfiniBand], synonyms: {RoCE v2: [roce, rocev2, roce2]}}
+    offloads:       {type: list, keywords: [IPsec, TLS, VXLAN, GENEVE, NVGRE, GRE, OVS, NVMe-oF],
+                     synonyms: {IPsec: [ipsec offload, cifrado ipsec], TLS: [ssl, tls offload], NVMe-oF: [nvme over fabrics]}}
     connector:      {type: string, patterns: ['\b(QSFP\d+)\b']}
     tdp:            {unit: W, type: number, compare: lte, aliases: [tdp]}
 
@@ -114,7 +116,11 @@ categories:
     package:             {type: string, aliases: [package]}
 
   Sensor:
-    measurands: {type: list, critical: true, keywords: [gas, pressure, humidity, temperature, gyroscope, accelerometer]}
+    measurands: {type: list, critical: true, keywords: [gas, pressure, humidity, temperature, gyroscope, accelerometer],
+                 synonyms: {gas: [gases, gases volatiles, voc, compuestos organicos volatiles, calidad del aire],
+                            pressure: [presion, presion barometrica, barometro], humidity: [humedad, humedad relativa],
+                            temperature: [temperatura], gyroscope: [giroscopio, giroscopo, gyro, rotacion],
+                            accelerometer: [acelerometro, aceleracion, accel]}}
     interface:  {type: list, critical: true, compare: intersects, keywords: [I2C, SPI]}
     dof:        {type: string, aliases: [dof]}
     package:    {type: string, patterns: ['\b(LGA|QFN)\b']}

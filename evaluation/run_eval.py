@@ -19,6 +19,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from advisor.agent import AdvisorAgent
+from advisor.agent.compose import unverified_tokens
 from advisor.commercial import CommercialEngine
 from advisor.config import REPO_ROOT, RetrieverBackend, get_settings
 from advisor.llm import LLMClient, TemplateClient, build_llm_chain
@@ -28,7 +29,7 @@ from advisor.models import (
     CustomerQuery,
     RecommendationResponse,
 )
-from advisor.pipeline import BuiltArtifacts, build_in_memory, build_retriever
+from advisor.pipeline import BuiltArtifacts, build_in_memory, build_retriever, load_databricks
 from advisor.retrieval import RetrievalUnavailableError, Retriever
 from evaluation.metrics import mean, precision_at_k, recall_at_k, reciprocal_rank
 
@@ -100,7 +101,8 @@ class CaseResult:
     forbidden: list[str] = field(default_factory=list)
     non_active: list[str] = field(default_factory=list)
     price_mismatch: list[str] = field(default_factory=list)
-    unverified_text: bool = False
+    unverified_text: bool = False  # final message has figures/part numbers not in the data
+    verify_fallback: bool = False  # VERIFY rejected the LLM text (protection worked; informative)
     p_at_3: float | None = None
     p_at_5: float | None = None
     r_at_5: float | None = None
@@ -112,7 +114,17 @@ def _document_ranking(retriever: Retriever, names: dict[str, str], query: str) -
         hits = retriever.search(query, top_k=RETRIEVAL_CHUNKS)
     except RetrievalUnavailableError:
         return []
-    return [names[h.chunk.document_id] for h in hits]
+    return [names.get(h.chunk.document_id, h.chunk.document_id) for h in hits]
+
+
+def _sources(resp: RecommendationResponse, built: BuiltArtifacts, case: GoldCase) -> str:
+    """Every figure the final message may contain: the structured response, the query, and the
+    catalog/datasheet data of any product the message names (e.g. a successor it rules out)."""
+    named = [p for p in built.products if p.part_number in resp.message]
+    return " ".join(
+        [resp.model_dump_json(exclude={"message"}), case.query]
+        + [p.model_dump_json() + " " + p.part_number for p in named]
+    )
 
 
 def evaluate_case(
@@ -174,7 +186,8 @@ def evaluate_case(
                 catalog[r.product.part_number].stock_units,
             )
         ],
-        unverified_text=any("no verificados" in w for w in resp.warnings),
+        unverified_text=bool(unverified_tokens(resp.message, _sources(resp, built, case), catalog)),
+        verify_fallback=any("no verificados" in w for w in resp.warnings),
         p_at_3=precision_at_k(docs, relevant, 3),
         p_at_5=precision_at_k(docs, relevant, 5),
         r_at_5=recall_at_k(docs, relevant, 5),
@@ -230,6 +243,7 @@ def summarize(results: list[CaseResult]) -> dict[str, float | int | None]:
         "gate_forbidden_recommendations": sum(len(r.forbidden) for r in results),
         "gate_non_active_recommendations": sum(len(r.non_active) for r in results),
         "gate_price_stock_mismatches": sum(len(r.price_mismatch) for r in results),
+        "verify_fallbacks": sum(r.verify_fallback for r in results),
         "gate_unverified_text": sum(r.unverified_text for r in results),
     }
 
@@ -302,8 +316,13 @@ def run(
     retriever_backend: RetrieverBackend = "bm25",
 ) -> tuple[Summary, list[CaseResult], str]:
     gold = gold or load_gold_set()
-    built = build_in_memory()
     settings = get_settings()
+    # repository_backend=databricks_sql evaluates over the live Delta tables (SQL warehouse).
+    built = (
+        load_databricks(settings)
+        if settings.repository_backend == "databricks_sql"
+        else build_in_memory()
+    )
     settings = settings.model_copy(
         update={"retrieval": settings.retrieval.model_copy(update={"backend": retriever_backend})}
     )

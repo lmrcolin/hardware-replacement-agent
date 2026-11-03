@@ -121,6 +121,9 @@ def _as_list(value: SpecValue) -> list[str]:
     return [str(v) for v in value] if isinstance(value, list) else [str(value)]
 
 
+INTERFACE_FAMILIES = ("PCIe", "USB")
+
+
 def _interface(required: str, candidate: str) -> tuple[RuleOutcome, str]:
     pcie = r"PCIe (\d)\.0(?: x(\d+))?"
     r_p, c_p = re.fullmatch(pcie, required), re.fullmatch(pcie, candidate)
@@ -138,6 +141,11 @@ def _interface(required: str, candidate: str) -> tuple[RuleOutcome, str]:
         if c_gen < r_gen:
             return RuleOutcome.CONDITIONAL, f"{candidate}: menos ancho de banda que {required}"
         return RuleOutcome.PASS, f"{candidate} = {required}"
+    family = next((f for f in INTERFACE_FAMILIES if _norm(required) == _norm(f)), None)
+    if family is not None:  # "USB" without version: any USB generation satisfies it
+        if _norm(candidate).startswith(_norm(family)):
+            return RuleOutcome.PASS, f"{candidate} es {family}"
+        return RuleOutcome.FAIL, f"interfaz {candidate} no es {family}"
     usb = r"USB (\d\.\d)"
     r_u, c_u = re.fullmatch(usb, required), re.fullmatch(usb, candidate)
     if r_u and c_u:

@@ -62,6 +62,7 @@ markers = [
     "stub: module contract not implemented yet (xfail until implemented)",
     "integration: multi-module tests over fixtures",
     "data: tests over the real PDFs in data/raw",
+    "safety: negative tests guarding against technically dangerous recommendations",
 ]
 
 [tool.ruff]

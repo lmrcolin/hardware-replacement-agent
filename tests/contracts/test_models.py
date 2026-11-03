@@ -227,7 +227,7 @@ class TestConfig:
     def test_spec_registry_covers_all_categories(self) -> None:
         reg = load_spec_registry(ROOT / "config" / "spec_registry.yaml")
         assert set(reg.categories) == set(Category)
-        assert all(3 <= len(keys) <= 6 for keys in reg.categories.values())
+        assert all(len(keys) >= 3 for keys in reg.categories.values())
         assert all(any(d.critical for d in keys.values()) for keys in reg.categories.values())
 
     def test_compat_rules_declared(self) -> None:

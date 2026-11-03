@@ -10,25 +10,271 @@
 #   expect_clarification: bool
 #   verified_by: str|null        who checked it against the PDFs
 #   notes: str
-version: "0.1.0"
+#
+# Criterios:
+# - Estado, precio y stock: Catalogo_Comercial_Precios_Inventario_2026.pdf (32 PN: 21 ACTIVE, 6 DISCONTINUED, 2 EOL, 3 NRND).
+# - Specs: datasheet de cada PN en data/raw (citado en notes como archivo).
+# - expected_level solo se fija cuando las reglas de config/compat_rules.yaml lo determinan sin ambigüedad;
+#   si depende de una decisión de implementación (R-ELEC con TDP, R-FF con encapsulado) queda null y se explica en notes.
+# - must_not_recommend incluye siempre el propio original no ACTIVE.
+version: "0.2.0"
 cases:
-  - id: PLACEHOLDER-01
-    query: "PLACEHOLDER — reemplazar con casos reales verificados"
+  # ---------------------------------------------------------------- Network
+  - id: NET-E810-PN
+    query: "Necesito un reemplazo para la tarjeta Intel E810-CQDA2, la usamos con RoCE v2 a 100GbE."
+    expected_original: E810-CQDA2
+    expected_status: DISCONTINUED
+    expected_top: [BCM57508, MCX75310AAS-NEAT]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
+    must_not_recommend: [E810-CQDA2]
+    expect_clarification: false
+    verified_by: kevin
+    notes: >-
+      Caso oficial del reto. Intel_E810_100GbE_NIC.pdf: 2x100GbE QSFP28, PCIe 4.0 x16, RoCE v2 + iWARP, VXLAN/GENEVE.
+      El propio datasheet sugiere ConnectX-7 y BCM57508. BCM57508 (broadcom-bcm57508-datasheet.pdf): 2x100GbE o 1x200GbE
+      QSFP56, PCIe Gen4 x16, RoCE v2 (sin iWARP). ConnectX-7: 4x100GbE/400GbE, PCIe 5.0 x16, RoCE v2 + iWARP.
+      Ambos son upgrade de velocidad/conector (R-UPGRADE) => con condiciones.
+  - id: NET-E810-REQ
+    query: "Busco una NIC de al menos 100GbE con RDMA RoCE v2 y host PCIe 4.0 x16, que esté disponible."
+    expected_original: null
+    expected_status: null
+    expected_top: [BCM57508, MCX75310AAS-NEAT]
+    expected_level: null
+    must_not_recommend: [E810-CQDA2]
+    expect_clarification: false
+    verified_by: kevin
+    notes: >-
+      Solo requisitos. E810 cumple técnicamente pero está DISCONTINUED (stock 0) => nunca recomendable.
+      Sin original no hay base para R-UPGRADE, por eso el nivel queda null.
+  - id: NET-E810-EN
+    query: "Replacement for the discontinued Intel E810 100GbE NIC, we rely on RoCE v2."
+    expected_original: E810-CQDA2
+    expected_status: DISCONTINUED
+    expected_top: [BCM57508, MCX75310AAS-NEAT]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
+    must_not_recommend: [E810-CQDA2]
+    expect_clarification: false
+    verified_by: kevin
+    notes: "Misma verificación que NET-E810-PN; consulta en inglés."
+  - id: NET-E810-TYPO
+    query: "reemplazo para E810CQDA2"
+    expected_original: E810-CQDA2
+    expected_status: DISCONTINUED
+    expected_top: [BCM57508, MCX75310AAS-NEAT]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
+    must_not_recommend: [E810-CQDA2]
+    expect_clarification: false
+    verified_by: kevin
+    notes: "Part number sin guion: resolve_part debe normalizarlo a E810-CQDA2."
+  - id: NET-IMPOSSIBLE
+    query: "Necesito una NIC de 800GbE con PCIe 6.0."
     expected_original: null
     expected_status: null
     expected_top: []
     expected_level: null
-    must_not_recommend: []
+    must_not_recommend: [E810-CQDA2, BCM57508, MCX75310AAS-NEAT]
     expect_clarification: false
-    verified_by: null
-    notes: "PLACEHOLDER — reemplazar con casos reales verificados (p. ej. caso oficial E810)."
-  - id: PLACEHOLDER-02
-    query: "PLACEHOLDER — reemplazar con casos reales verificados"
+    verified_by: kevin
+    notes: "Requisitos imposibles: la NIC más rápida del catálogo es ConnectX-7 (400GbE, PCIe 5.0). Debe responder sin sustituto, sin inventar."
+
+  # -------------------------------------------------------------------- GPU
+  - id: GPU-A100-PN
+    query: "¿Qué me recomiendas en lugar de la NVIDIA A100 80GB SXM4?"
+    expected_original: A100-SXM4-80GB
+    expected_status: NRND
+    expected_top: [H100-SXM5]
+    expected_level: null
+    must_not_recommend: [A100-SXM4-80GB, RTX-4090, MI300X]
+    expect_clarification: false
+    verified_by: kevin
+    notes: >-
+      NVIDIA_A100_80GB_GPU.pdf: 80 GB HBM2e, form factors SXM4 y PCIe, TDP 400W (SXM4) / 300W (PCIe); el datasheet indica
+      migración a H100. H100 (NVIDIA_H100_SXM5_GPU.pdf): 80 GB HBM3, SXM5 y PCIe, TDP 700W/350W. Coinciden en PCIe.
+      Nivel null: depende de R-ELEC (TDP del H100 > A100), decidir si eso es INCOMPATIBLE o condición de potencia/refrigeración.
+      RTX-4090: 24 GB < 80 GB (R-NUM-GTE) y sin NVLink. MI300X: form factor OAM (R-FF) y stack ROCm.
+      A100 es NRND: solo puede aparecer en risky_options, nunca en recommendations.
+  - id: GPU-A100-REQ
+    query: "Busco GPU de centro de datos con al menos 80 GB de memoria HBM y formato PCIe."
+    expected_original: null
+    expected_status: null
+    expected_top: [H100-SXM5]
+    expected_level: null
+    must_not_recommend: [A100-SXM4-80GB, RTX-4090]
+    expect_clarification: false
+    verified_by: kevin
+    notes: "H100 tiene variante PCIe con 80 GB HBM3. MI300X (192 GB) solo OAM. RTX-4090 24 GB GDDR6X. A100 NRND."
+  - id: GPU-H100-ACTIVE
+    query: "Busco reemplazo para la H100-SXM5."
+    expected_original: H100-SXM5
+    expected_status: ACTIVE
+    expected_top: []
+    expected_level: null
+    must_not_recommend: [A100-SXM4-80GB]
+    expect_clarification: false
+    verified_by: kevin
+    notes: "Pieza ACTIVE (2,850.00 USD, stock 45 en el catálogo): el agente debe informar que no requiere reemplazo."
+
+  # -------------------------------------------------------------------- DAQ
+  - id: DAQ-1608GX-PN
+    query: "Se descontinuó nuestra USB-1608GX, ¿con qué la sustituyo?"
+    expected_original: USB-1608GX
+    expected_status: DISCONTINUED
+    expected_top: [USB-1808X, USB-2633]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
+    must_not_recommend: [USB-1608GX, AD7606, USB-6001, USB-2627]
+    expect_clarification: false
+    verified_by: kevin
+    notes: >-
+      USB-1608GX-data.pdf: 16 SE, 16 bit, 500 kS/s, USB 2.0. USB-1808X: 16 SE, 18 bit, 1 MS/s, USB 3.0.
+      USB-2633: 64 SE, 16 bit, 2 MS/s, USB 3.0. Ambos >= en todo; host_interface cambia USB 2.0 -> 3.0 (upgrade => condición).
+      AD7606: 8 canales < 16 e interfaz SPI/paralela (no USB).
+  - id: DAQ-1608GX-REQ
+    query: "DAQ USB con 16 entradas analógicas, 16 bits y al menos 500 kS/s."
+    expected_original: null
+    expected_status: null
+    expected_top: [USB-1808X, USB-2633]
+    expected_level: null
+    must_not_recommend: [USB-1608GX, AD7606, USB-6001]
+    expect_clarification: false
+    verified_by: kevin
+    notes: "Solo requisitos; USB-1608GX cumple pero está DISCONTINUED."
+  - id: DAQ-2627-PN
+    query: "Reemplazo para la USB-2627 de MCC."
+    expected_original: USB-2627
+    expected_status: DISCONTINUED
+    expected_top: [USB-2633]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
+    must_not_recommend: [USB-2627, USB-1808X, AD7606]
+    expect_clarification: false
+    verified_by: kevin
+    notes: >-
+      USB-2627_Multifunction_DAQ.pdf: 64 SE, 16 bit, 1 MS/s, USB 2.0, 48 DIO, 4 contadores; recomienda USB-2633.
+      USB-2633: 64 SE, 16 bit, 2 MS/s, USB 3.0, 48 DIO, 4 contadores. Upgrade de interfaz => condición.
+      USB-1808X: solo 16 canales < 64.
+  - id: DAQ-2627-REQ
+    query: "Necesito una DAQ USB con 64 entradas analógicas de 16 bits y al menos 1 MS/s."
+    expected_original: null
+    expected_status: null
+    expected_top: [USB-2633]
+    expected_level: null
+    must_not_recommend: [USB-2627, USB-1808X]
+    expect_clarification: false
+    verified_by: kevin
+    notes: "Solo USB-2627 (DISCONTINUED) y USB-2633 tienen 64 canales."
+  - id: DAQ-6001-PN
+    query: "La NI USB-6001 llegó a fin de vida, ¿qué alternativa hay?"
+    expected_original: USB-6001
+    expected_status: EOL
+    expected_top: [USB-1808X, USB-2633]
+    expected_level: COMPATIBLE_WITH_CONDITIONS
+    must_not_recommend: [USB-6001, AD7606, USB-1608GX, USB-2627]
+    expect_clarification: false
+    verified_by: kevin
+    notes: >-
+      NI-USB-6001-datasheet.pdf: 8 SE, 14 bit, 20 kS/s, USB 2.0. USB-1808X y USB-2633 superan todo pero son USB 3.0 => condición.
+      Trampa: AD7606 tiene 8 canales y 16 bit pero es un chip con interfaz SPI/paralela, no un dispositivo USB (host_interface crítica).
+
+  # ---------------------------------------------------------- Microcontroller
+  - id: MCU-SAMD21-PN
+    query: "Necesito sustituir el ATSAMD21G18A en un diseño nuevo."
+    expected_original: ATSAMD21G18A
+    expected_status: DISCONTINUED
+    expected_top: [RP2040]
+    expected_level: null
+    must_not_recommend: [ATSAMD21G18A, ESP32-S3, STM32H743ZIT6]
+    expect_clarification: false
+    verified_by: kevin
+    notes: >-
+      atsamd21-datasheet.pdf: Cortex-M0+ 48 MHz, 256 KB flash, 32 KB SRAM, USB device/host, 48-pin TQFP/QFN.
+      RP2040: 2x Cortex-M0+ (core crítico coincide), 264 KB SRAM, flash externa QSPI, USB device; encapsulado no declarado.
+      Nivel null: depende de R-FF con package ausente en RP2040 (MISSING => UNKNOWN) y de tratar la flash externa como condición.
+      ESP32-S3 (Xtensa LX7) y STM32H743 (Cortex-M7): core distinto => INCOMPATIBLE por regla crítica.
+  - id: MCU-SAMD21-REQ
+    query: "Microcontrolador Cortex-M0+ con USB y al menos 32 KB de SRAM."
+    expected_original: null
+    expected_status: null
+    expected_top: [RP2040]
+    expected_level: null
+    must_not_recommend: [ATSAMD21G18A, ESP32-S3]
+    expect_clarification: false
+    verified_by: kevin
+    notes: "Solo SAMD21 (DISCONTINUED) y RP2040 son Cortex-M0+."
+
+  # ------------------------------------------------------------------ FPGA
+  - id: FPGA-ARTIX7-PN
+    query: "La Artix-7 XC7A200T pasó a NRND, ¿qué FPGA del catálogo la reemplaza?"
+    expected_original: XC7A200T
+    expected_status: NRND
+    expected_top: [AGFB014R24A]
+    expected_level: null
+    must_not_recommend: [XC7A200T, ICE40UP5K]
+    expect_clarification: false
+    verified_by: kevin
+    notes: >-
+      xilinx-artix7-datasheet.pdf: 215,360 logic cells, 740 DSP, 500 I/O, 16 GTP a 6.6 Gb/s, BGA/CSG.
+      Agilex 7 AGFB014R24A: ~1.4 M logic elements, 624 I/O, package 2486A FBGA, otro fabricante y toolchain.
+      Nivel null: depende de R-FF (package distinto implica rediseño de placa). ICE40UP5K: 5,280 LUTs << 215,360.
+
+  # --------------------------------------------------- sin sustituto válido
+  - id: SENSOR-MPU6050-NONE
+    query: "Reemplazo para el IMU MPU-6050."
+    expected_original: MPU-6050
+    expected_status: DISCONTINUED
+    expected_top: []
+    expected_level: INCOMPATIBLE
+    must_not_recommend: [MPU-6050, BME680]
+    expect_clarification: false
+    verified_by: kevin
+    notes: >-
+      mpu6050-datasheet.pdf: giroscopio + acelerómetro (6 ejes), I2C. Único otro sensor: BME680 (gas, presión, humedad,
+      temperatura). Measurands disjuntos => INCOMPATIBLE. Debe responder que no hay sustituto en el catálogo.
+  - id: POWER-IR3555-NONE
+    query: "El regulador IR3555MTRPBF está en EOL, ¿qué uso?"
+    expected_original: IR3555MTRPBF
+    expected_status: EOL
+    expected_top: []
+    expected_level: INCOMPATIBLE
+    must_not_recommend: [IR3555MTRPBF, TPS65982AB]
+    expect_clarification: false
+    verified_by: kevin
+    notes: >-
+      ir3555-datasheet.pdf: power stage 60 A. Único otro Power: TPS65982AB, controlador USB PD (5 A). Corriente crítica muy inferior.
+      Ojo calidad de datos: el datasheet da Vin 4.5-15 V y Vout 0.25-3.3 V en el texto, pero 5-12 V y 0.25-1.52 V en el resumen.
+  - id: STORAGE-SN860-NONE
+    query: "Busco sustituto del SSD WD Ultrastar DC SN860 de 6.4 TB."
+    expected_original: WUS4C6464DSP3X5
+    expected_status: DISCONTINUED
+    expected_top: []
+    expected_level: INCOMPATIBLE
+    must_not_recommend: [WUS4C6464DSP3X5, MZ-V9P2T0]
+    expect_clarification: false
+    verified_by: kevin
+    notes: >-
+      wd-ultrastar-dc-sn860.pdf: 6.4 TB, U.2 2.5", PCIe Gen4 x4 dual-port, 3 DWPD. Único otro Storage: Samsung 990 PRO 2 TB M.2.
+      Capacidad 2 < 6.4 TB y form factor M.2 != U.2 => INCOMPATIBLE.
+      Ojo calidad de datos: lectura secuencial 6.4 GB/s en el texto vs 7100 MB/s en el resumen.
+  - id: CPU-A78-NONE
+    query: "Arm Cortex-A78 está como NRND, ¿qué alternativa hay en el catálogo?"
+    expected_original: Cortex-A78
+    expected_status: NRND
+    expected_top: []
+    expected_level: null
+    must_not_recommend: [Cortex-A78, EPYC-9654, w9-3595X]
+    expect_clarification: false
+    verified_by: kevin
+    notes: >-
+      arm-cortex-a78-trm.pdf: núcleo IP Armv8.2-A licenciable; Arm recomienda núcleos Armv9, que no están en el catálogo.
+      Los otros CPU (EPYC-9654, w9-3595X) son procesadores x86 con socket: no reemplazan un IP core.
+      Nivel null: según la implementación saldrá UNKNOWN (socket/tdp ausentes en A78) o INCOMPATIBLE (arquitectura).
+
+  # ---------------------------------------------------------------- ambigua
+  - id: AMBIGUOUS-01
+    query: "Necesito un reemplazo para mi tarjeta."
     expected_original: null
     expected_status: null
     expected_top: []
     expected_level: null
     must_not_recommend: []
     expect_clarification: true
-    verified_by: null
-    notes: "PLACEHOLDER — reemplazar con casos reales verificados (consulta ambigua → CLARIFY)."
+    verified_by: kevin
+    notes: "Sin part number ni requisitos: debe pedir aclaración (CLARIFY) en lugar de recomendar."

@@ -41,7 +41,7 @@ from advisor.models import (
     TechnicalRequirement,
 )
 from advisor.recommendation import rank
-from advisor.retrieval import Retriever
+from advisor.retrieval import RetrievalUnavailableError, Retriever
 
 log = logging.getLogger(__name__)
 
@@ -159,7 +159,18 @@ class AdvisorAgent:
         pool = {p.part_number for p in self.products.values() if p.category is original.category}
         for c in candidate_neighbors(self.graph, original.part_number, max_candidates=50):
             pool.add(c.part_number)
-        for hit in self.retriever.search(run.query.text, top_k=8):
+        try:
+            hits = self.retriever.search(run.query.text, top_k=8)
+        except RetrievalUnavailableError as exc:
+            hits = []
+            run.warnings.append(
+                f"Búsqueda documental no disponible ({exc}); se usa catálogo y grafo."
+            )
+        for error in getattr(self.retriever, "last_errors", []):
+            run.warnings.append(
+                f"Búsqueda semántica no disponible; se usó solo BM25 ({error[:120]})."
+            )
+        for hit in hits:
             pool.update(pn for pn in hit.chunk.part_numbers if pn in self.products)
         pool.discard(original.part_number)
         return [self.products[p] for p in sorted(pool) if p in self.products]

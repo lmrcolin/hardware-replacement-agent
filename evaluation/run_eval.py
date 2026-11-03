@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from advisor.agent import AdvisorAgent
 from advisor.commercial import CommercialEngine
-from advisor.config import REPO_ROOT, get_settings
+from advisor.config import REPO_ROOT, RetrieverBackend, get_settings
 from advisor.llm import LLMClient, TemplateClient, build_llm_chain
 from advisor.models import (
     CommercialStatus,
@@ -28,8 +28,8 @@ from advisor.models import (
     CustomerQuery,
     RecommendationResponse,
 )
-from advisor.pipeline import BuiltArtifacts, build_in_memory
-from advisor.retrieval import BM25Retriever
+from advisor.pipeline import BuiltArtifacts, build_in_memory, build_retriever
+from advisor.retrieval import RetrievalUnavailableError, Retriever
 from evaluation.metrics import mean, precision_at_k, recall_at_k, reciprocal_rank
 
 GOLD_SET = Path(__file__).with_name("gold_set.yaml")
@@ -106,8 +106,11 @@ class CaseResult:
     retrieval_rr: float | None = None
 
 
-def _document_ranking(retriever: BM25Retriever, names: dict[str, str], query: str) -> list[str]:
-    hits = retriever.search(query, top_k=RETRIEVAL_CHUNKS)
+def _document_ranking(retriever: Retriever, names: dict[str, str], query: str) -> list[str]:
+    try:
+        hits = retriever.search(query, top_k=RETRIEVAL_CHUNKS)
+    except RetrievalUnavailableError:
+        return []
     return [names[h.chunk.document_id] for h in hits]
 
 
@@ -266,11 +269,17 @@ Summary = dict[str, float | int | None]
 
 
 def run(
-    chain: list[LLMClient] | None = None, gold: GoldSet | None = None
+    chain: list[LLMClient] | None = None,
+    gold: GoldSet | None = None,
+    retriever_backend: RetrieverBackend = "bm25",
 ) -> tuple[Summary, list[CaseResult], str]:
     gold = gold or load_gold_set()
     built = build_in_memory()
-    retriever = BM25Retriever(built.chunks)
+    settings = get_settings()
+    settings = settings.model_copy(
+        update={"retrieval": settings.retrieval.model_copy(update={"backend": retriever_backend})}
+    )
+    retriever = build_retriever(settings, built.chunks)
     chain = chain or [TemplateClient()]
     agent = AdvisorAgent(
         graph=built.graph,
@@ -303,21 +312,27 @@ def main() -> int:
     parser.add_argument(
         "--gold", type=Path, default=GOLD_SET, help="case file (default: evaluation/gold_set.yaml)"
     )
+    parser.add_argument(
+        "--retriever",
+        choices=["bm25", "ai_search", "hybrid"],
+        default="bm25",
+        help="bm25 (offline, default) | ai_search | hybrid (needs ADVISOR_DATABRICKS_PROFILE)",
+    )
     args = parser.parse_args()
     gold = load_gold_set(args.gold)
     if not [c for c in gold.cases if not c.is_placeholder]:
         print(f"{args.gold.name}: sin casos reales todavía (solo PLACEHOLDER); nada que evaluar.")
         return 0
     chain = build_llm_chain(get_settings()) if args.llm == "configured" else None
-    summary, results, provider = run(chain, gold)
-    report = render_markdown(summary, results, provider, args.gold.name)
+    summary, results, provider = run(chain, gold, args.retriever)
+    report = render_markdown(
+        summary, results, f"{provider}` · retriever: `{args.retriever}", args.gold.name
+    )
     print(report)
     if not args.no_report:
-        report_md = (
-            REPORT_MD
-            if args.gold == GOLD_SET
-            else REPORT_MD.with_name(f"report_{args.gold.stem}.md")
-        )
+        suffix = "" if args.gold == GOLD_SET else f"_{args.gold.stem}"
+        suffix += "" if args.retriever == "bm25" else f"_{args.retriever}"
+        report_md = REPORT_MD.with_name(f"report{suffix}.md")
         report_md.write_text(report, encoding="utf-8")
         RESULTS_JSON.parent.mkdir(parents=True, exist_ok=True)
         RESULTS_JSON.write_text(

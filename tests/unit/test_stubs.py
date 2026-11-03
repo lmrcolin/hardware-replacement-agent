@@ -73,14 +73,12 @@ def bare(p: Product) -> Product:
 
 
 # ---------- Datos ----------
-@pending("B-04")
 def test_discover_documents_finds_33_pdfs() -> None:
     docs = ingestion.discover_documents(PDF_DIR)
     assert len(docs) == 33
     assert sum(d.doc_type is DocumentType.CATALOG for d in docs) == 1
 
 
-@pending("B-03")
 def test_parse_catalog_returns_32_rows_with_expected_statuses() -> None:
     rows = parsing.parse_catalog(record(CATALOG, DocumentType.CATALOG))
     assert len(rows) == 32
@@ -94,7 +92,6 @@ def test_parse_catalog_returns_32_rows_with_expected_statuses() -> None:
     assert all(r.price_usd is None for r in rows if r.status is not CommercialStatus.ACTIVE)
 
 
-@pending("B-04")
 def test_parse_document_reads_datasheet() -> None:
     doc = parsing.parse_document(
         record(PDF_DIR / "Intel_E810_100GbE_NIC.pdf", DocumentType.DATASHEET)

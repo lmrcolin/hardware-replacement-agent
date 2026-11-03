@@ -12,23 +12,24 @@ dist/
 .mypy_cache/
 .coverage
 htmlcov/
+.import_linter_cache/
 
 # Secrets / local config
 .env
 .env.*
 !.env.example
 .databrickscfg
+*.pem
+*.key
 
-# Data: raw source documents are tracked; derived outputs are not
-data/processed/*
-!data/**/.gitkeep
+# Generated artifacts (rebuilt by `make pipeline-local` or notebook 07)
+artifacts/*
+!artifacts/.gitkeep
 
-# Local Spark / MLflow artifacts
-spark-warehouse/
-metastore_db/
-derby.log
-mlruns/
-mlartifacts/
+# Models / indexes downloaded at runtime
+models/
+*.faiss
+.cache/
 
 # Databricks bundle state
 .databricks/

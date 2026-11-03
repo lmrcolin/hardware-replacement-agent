@@ -1,62 +1,108 @@
 [project]
-name = "emerson-agent"
+name = "emerson-advisor"
 version = "0.1.0"
-description = "Agentic assistant to find and justify replacements for discontinued industrial hardware."
-# Databricks serverless environments 3/4 run Python 3.12; keep local parity.
-requires-python = ">=3.12,<3.13"
+description = "Emerson Replacement Advisor: agentic recommendation of active substitutes for discontinued parts."
+requires-python = "==3.12.*"
 dependencies = [
     "pydantic>=2.9",
-    "pydantic-settings>=2.6",
-    "langgraph>=0.2",
-    "pypdf>=5.0",
+    "networkx>=3.3",
+    "pandas>=2.2",
+    "pyarrow>=17.0",
+    "pdfplumber>=0.11",
+    "pymupdf>=1.24",
     "rank-bm25>=0.2.2",
+    "rapidfuzz>=3.9",
+    "sentence-transformers>=3.0",
+    # CPU-only wheel (see [tool.uv.sources]); avoids multi-GB CUDA downloads.
+    "torch>=2.4",
+    "faiss-cpu>=1.8",
+    "streamlit>=1.40",
+    "openpyxl>=3.1",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "databricks-sdk>=0.30",
+    "httpx>=0.27",
 ]
-
-[project.optional-dependencies]
-app = ["streamlit>=1.40"]
-# Local Spark is for unit-testing transforms only; it is NOT a substitute for running on Databricks.
-spark = ["pyspark>=3.5,<4.1", "delta-spark>=3.2"]
-mlops = ["mlflow>=2.17"]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
-    "pytest-cov>=6.0",
     "ruff>=0.8",
     "mypy>=1.13",
+    "types-pyyaml>=6.0",
+    "pre-commit>=4.0",
+    "import-linter>=2.1",
 ]
+
+[project.scripts]
+advisor-pipeline = "advisor.pipeline:main"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/emerson_agent"]
+packages = ["src/advisor"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = [".", "src"]
 addopts = "-ra --strict-markers"
+xfail_strict = true
 markers = [
-    "integration: tests that touch filesystem fixtures or multiple modules",
-    "spark: tests that need a local SparkSession (install extra 'spark')",
-    "safety: negative tests guarding against dangerous recommendations",
+    "contract: model and import-direction contracts (must always pass)",
+    "stub: module contract not implemented yet (xfail until the owner implements it)",
+    "integration: multi-module tests over fixtures",
+    "data: tests over the real PDFs in datos/pdfs",
 ]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["src", "tests", "app"]
+extend-exclude = ["notebooks"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM", "PL", "RUF"]
-ignore = ["PLR0913"]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**" = ["PLR2004"]
-"databricks/**" = ["E402"]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "src"
+ignore_missing_imports = true
+
+# Dependency direction (higher layers may import lower ones, never the reverse).
+# Mirrored by tests/contracts/test_imports.py so `pytest` alone also catches violations.
+[tool.importlinter]
+root_package = "advisor"
+
+[[tool.importlinter.contracts]]
+name = "Layered architecture"
+type = "layers"
+layers = [
+    "advisor.pipeline",
+    "advisor.agent",
+    "advisor.recommendation | advisor.llm",
+    "advisor.compatibility | advisor.commercial | advisor.retrieval",
+    "advisor.kg",
+    "advisor.chunking | advisor.enrichment",
+    "advisor.extraction",
+    "advisor.parsing",
+    "advisor.ingestion",
+    "advisor.repository",
+    "advisor.models | advisor.config",
+]
+
+[[tool.importlinter.contracts]]
+name = "Compatibility engine is deterministic (no LLM, no retrieval)"
+type = "forbidden"
+source_modules = ["advisor.compatibility", "advisor.recommendation"]
+forbidden_modules = ["advisor.llm", "advisor.retrieval", "httpx", "databricks"]

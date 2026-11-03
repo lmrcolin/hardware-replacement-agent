@@ -1,43 +1,45 @@
 UV ?= uv
+PROFILE ?= emerson
 
-.PHONY: help install install-spark install-mlops test test-unit cov lint format typecheck app clean
+.PHONY: help setup check lint imports typecheck test test-contracts pipeline-local eval app excel clean
 
 help:
-	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
 
-install: ## Create venv (Python 3.12) with core, dev and app deps
-	$(UV) sync --extra app
+setup: ## Create .venv (Python 3.12), install deps and git hooks
+	$(UV) sync
+	$(UV) run pre-commit install
 
-install-spark: ## Add local PySpark + Delta (needs Java 17/21)
-	$(UV) sync --extra app --extra spark
+check: lint imports test ## Lint + dependency contracts + tests (stubs xfail)
 
-install-mlops: ## Add MLflow for local evaluation tracking
-	$(UV) sync --extra app --extra mlops
-
-test: ## Run all tests
-	$(UV) run pytest
-
-test-unit: ## Run unit tests only
-	$(UV) run pytest tests/unit
-
-cov: ## Tests with coverage report
-	$(UV) run pytest --cov=emerson_agent --cov-report=term-missing
-
-lint: ## Ruff lint + mypy
+lint: ## Ruff lint and format check
 	$(UV) run ruff check .
 	$(UV) run ruff format --check .
+
+imports: ## import-linter dependency direction
+	$(UV) run lint-imports
+
+typecheck: ## mypy strict on src
 	$(UV) run mypy src
 
-format: ## Auto-format and fix lint
-	$(UV) run ruff format .
-	$(UV) run ruff check --fix .
+test: ## All tests
+	$(UV) run pytest
 
-typecheck: ## mypy only
-	$(UV) run mypy src
+test-contracts: ## Contract tests only
+	$(UV) run pytest tests/contracts
 
-app: ## Launch Streamlit UI
+pipeline-local: ## Build artifacts locally from datos/pdfs (stubs until implemented)
+	$(UV) run advisor-pipeline
+
+eval: ## Run evaluation over evaluation/gold_set.yaml
+	$(UV) run python evaluation/run_eval.py
+
+app: ## Streamlit UI (uses MockAdvisorAgent until the agent exists)
 	$(UV) run streamlit run app/streamlit_app.py
 
-clean: ## Remove caches
-	rm -rf .pytest_cache .ruff_cache .mypy_cache htmlcov .coverage
+excel: ## Build TCO workbook into cost/
+	$(UV) run python scripts/build_tco_excel.py
+
+clean:
+	rm -rf .pytest_cache .ruff_cache .mypy_cache
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +

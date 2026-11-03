@@ -178,7 +178,7 @@ BM25, repositorio local, golden set de 22 casos.
    `docs/ARCHITECTURE_DECISIONS.md` como ADR-013 "Propuesto".
 - Aceptación: `make eval` con puertas en 0 y report actualizado.
 
-### L5. Demo y documentación (B-25) — rama `docs/demo`
+### L5. ✅ Demo y documentación (B-25) — rama `docs/demo` (falta el ensayo en vivo)
 1. `docs/DEMO_PLAN.md`: guion minuto a minuto (problema y 4 M USD → caso oficial → USB-2627 → A100 sucesor bloqueado →
    consulta vaga → reproducibilidad con `make check`/`make eval` y job `run_all` de Kevin → Excel TCO), con frases
    exactas y plan B sin red (LLM template + artefactos locales).

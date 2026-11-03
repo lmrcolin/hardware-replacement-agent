@@ -1,0 +1,62 @@
+[project]
+name = "emerson-agent"
+version = "0.1.0"
+description = "Agentic assistant to find and justify replacements for discontinued industrial hardware."
+# Databricks serverless environments 3/4 run Python 3.12; keep local parity.
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "langgraph>=0.2",
+    "pypdf>=5.0",
+    "rank-bm25>=0.2.2",
+]
+
+[project.optional-dependencies]
+app = ["streamlit>=1.40"]
+# Local Spark is for unit-testing transforms only; it is NOT a substitute for running on Databricks.
+spark = ["pyspark>=3.5,<4.1", "delta-spark>=3.2"]
+mlops = ["mlflow>=2.17"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/emerson_agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: tests that touch filesystem fixtures or multiple modules",
+    "spark: tests that need a local SparkSession (install extra 'spark')",
+    "safety: negative tests guarding against dangerous recommendations",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "app"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "PL", "RUF"]
+ignore = ["PLR0913"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLR2004"]
+"databricks/**" = ["E402"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"

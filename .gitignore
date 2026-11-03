@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+.databrickscfg
+
+# Data: only synthetic, versioned fixtures are tracked
+data/raw/*
+data/processed/*
+!data/**/.gitkeep
+
+# Local Spark / MLflow artifacts
+spark-warehouse/
+metastore_db/
+derby.log
+mlruns/
+mlartifacts/
+
+# Databricks bundle state
+.databricks/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Claude Code local settings
+.claude/settings.local.json

@@ -1,5 +1,5 @@
 {
-  "contract_version": "1.0.0",
+  "contract_version": "1.1.0",
   "query": {
     "text": "Necesito un reemplazo para la tarjeta",
     "language": "es",
@@ -17,6 +17,7 @@
   "original": null,
   "recommendations": [],
   "risky_options": [],
+  "unverified_options": [],
   "clarification_question": "¿Qué part number o categoría de producto necesitas reemplazar?",
   "message": "Necesito más información para buscar un sustituto.",
   "llm_provider": "template",

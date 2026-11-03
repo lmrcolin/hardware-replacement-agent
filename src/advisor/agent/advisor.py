@@ -230,7 +230,7 @@ class AdvisorAgent:
         }
         return self._response(
             run, parsed, original, ranked.recommendations, ranked.risky_options, None,
-            blocked=blocked,
+            blocked=blocked, unverified=ranked.unverified_options,
         )  # fmt: skip
 
     def _find_by_requirements(self, run: _Run, parsed: ParsedQuery) -> RecommendationResponse:
@@ -244,7 +244,10 @@ class AdvisorAgent:
         ]
         run.trace.append(AgentStep.RANK)
         ranked = rank(results, self.products)
-        return self._response(run, parsed, None, ranked.recommendations, ranked.risky_options, None)
+        return self._response(
+            run, parsed, None, ranked.recommendations, ranked.risky_options, None,
+            unverified=ranked.unverified_options,
+        )  # fmt: skip
 
     def _response(
         self,
@@ -257,12 +260,13 @@ class AdvisorAgent:
         *,
         message: str | None = None,
         blocked: Mapping[str, CompatibilityResult] | None = None,
+        unverified: Sequence[Recommendation] = (),
     ) -> RecommendationResponse:
         recs = list(recommendations)
         risk = list(risky)
         if message is None:
             run.trace.append(AgentStep.COMPOSE)
-            draft = draft_message(original, recs, risk, blocked or {})
+            draft = draft_message(original, recs, risk, blocked or {}, unverified)
             message = self._rephrase(draft, run)
         else:
             run.providers.append("template")
@@ -273,6 +277,7 @@ class AdvisorAgent:
             original=original,
             recommendations=recs,
             risky_options=risk,
+            unverified_options=list(unverified),
             clarification_question=clarification,
             message=message,
             llm_provider="+".join(dict.fromkeys(run.providers)),

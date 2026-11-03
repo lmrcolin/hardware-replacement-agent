@@ -210,6 +210,22 @@ def test_only_active_recommended_nrnd_risky_rest_dropped() -> None:
     out = rank(results, products)
     assert [r.product.part_number for r in out.recommendations] == ["SYN-A"]
     assert [r.product.part_number for r in out.risky_options] == ["SYN-N"]
+    assert out.unverified_options == []
+
+
+@pytest.mark.safety
+def test_unknown_goes_to_unverified_not_recommendations() -> None:
+    products = {"SYN-A": nic("SYN-A"), "SYN-U": nic("SYN-U", stock=10_000)}
+    out = rank(
+        [
+            _result("SYN-U", CompatibilityLevel.UNKNOWN),
+            _result("SYN-A", CompatibilityLevel.COMPATIBLE_WITH_CONDITIONS),
+        ],
+        products,
+    )
+    assert [r.product.part_number for r in out.recommendations] == ["SYN-A"]
+    assert [r.product.part_number for r in out.unverified_options] == ["SYN-U"]
+    assert out.unverified_options[0].rank == 1
 
 
 def test_commercial_engine_hides_price_of_non_active() -> None:

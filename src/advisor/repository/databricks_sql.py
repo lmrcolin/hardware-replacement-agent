@@ -88,6 +88,15 @@ class DeltaTable:
             f"ORDER BY {self.order_by}"
         )
 
+    def insert_overwrite(self, catalog: str) -> str:
+        """Replace the rows but keep the Delta table id: ``CREATE OR REPLACE`` assigns a new id,
+        which breaks streaming readers such as the AI Search Delta Sync index."""
+        return (
+            f"INSERT OVERWRITE {self.fqn(catalog)} "
+            f"SELECT * FROM read_files('{self.staging_path(catalog)}', format => 'parquet') "
+            f"ORDER BY {self.order_by}"
+        )
+
 
 def _table(
     layer: str, name: str, cols: list[tuple[str, pa.DataType]], order: str, doc: str
@@ -358,15 +367,23 @@ def now_utc() -> datetime:
 
 
 def write_delta_with_spark(
-    spark: Any, catalog: str, spec: DeltaTable, rows: list[dict[str, Any]]
+    spark: Any,
+    catalog: str,
+    spec: DeltaTable,
+    rows: list[dict[str, Any]],
+    *,
+    keep_table_id: bool = False,
 ) -> int:
-    """Notebook path: stage Parquet on the volume (FUSE write) and CTAS. Returns the row count."""
+    """Notebook path: stage Parquet on the volume (FUSE write) and CTAS. Returns the row count.
+
+    ``keep_table_id`` overwrites an existing table in place (for tables read by a stream)."""
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS `{_identifier(catalog, 'catálogo')}`.`{spec.layer}`")
     spark.sql(f"CREATE VOLUME IF NOT EXISTS `{catalog}`.`gold`.`{ARTIFACTS_VOLUME}`")
     path = Path(spec.staging_path(catalog))
     path.parent.mkdir(parents=True, exist_ok=True)
     pq.write_table(arrow_table(spec, rows), path)
-    spark.sql(spec.ctas(catalog))
+    exists = spark.catalog.tableExists(f"{catalog}.{spec.layer}.{spec.name}")
+    spark.sql(spec.insert_overwrite(catalog) if keep_table_id and exists else spec.ctas(catalog))
     count = spark.table(spec.fqn(catalog)).count()
     if count != len(rows):
         raise RuntimeError(f"{spec.key}: {count} filas escritas, se esperaban {len(rows)}")

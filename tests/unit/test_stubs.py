@@ -153,13 +153,11 @@ def test_commercial_engine(commercial_rows: list[CommercialInformation]) -> None
     assert engine.availability("SYN-GPU-100").price_usd is None  # NRND: no price
 
 
-@pending("B-15")
 def test_category_mismatch_is_incompatible(products: dict[str, Product]) -> None:
     result = evaluate(products["SYN-NIC-100"], products["SYN-MCU-100"], [])
     assert result.level is CompatibilityLevel.INCOMPATIBLE
 
 
-@pending("B-15")
 def test_missing_required_spec_is_never_compatible(products: dict[str, Product]) -> None:
     req = TechnicalRequirement(
         key="rdma", operator=Operator.HAS, value="RoCE v2", origin=RequirementOrigin.QUERY

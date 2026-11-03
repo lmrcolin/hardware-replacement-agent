@@ -1,48 +1,62 @@
-# Databricks notebook source
-# MAGIC %md
-# MAGIC # 01 · Bronze: parsing de PDFs
-# MAGIC Parsea los 33 PDFs con `ai_parse_document` a `bronze.documents_parsed`.
-# MAGIC Si ya están parseados no vuelve a gastar cómputo (usa `force=true` para rehacerlo).
+# Hardware Replacement Agent
 
-# COMMAND ----------
+Asistente agéntico que, dado un componente industrial descontinuado (por part number o por requisitos),
+propone sustitutos **vendibles** y justifica su compatibilidad con citas a datasheet y página.
 
-# ruff: noqa: F821  (spark y dbutils los inyecta Databricks)
-dbutils.widgets.text("catalog", "emerson_hw")
-dbutils.widgets.dropdown("force", "false", ["false", "true"])
-CATALOG = dbutils.widgets.get("catalog")
-FORCE = dbutils.widgets.get("force") == "true"
-TABLE = f"{CATALOG}.bronze.documents_parsed"
-VOLUME_DIR = f"/Volumes/{CATALOG}/bronze/raw_files/"
-EXPECTED_PDFS = 33
+- Datos: catálogo comercial con precios e inventario + 32 datasheets (33 PDFs sintéticos en `data/raw/`).
+- Plataforma: Databricks Free Edition (Unity Catalog, serverless, `ai_parse_document`, Vector Search).
+- Agente: LangGraph con herramientas de catálogo, retrieval y un motor de compatibilidad determinista.
 
-# COMMAND ----------
+## Requisitos
 
-already = spark.table(TABLE).count() if spark.catalog.tableExists(TABLE) else 0
+- [uv](https://docs.astral.sh/uv/) y Python 3.12
+- [Databricks CLI](https://docs.databricks.com/dev-tools/cli/install.html) ≥ 0.250
+- Una cuenta de Databricks Free Edition
 
-if already == EXPECTED_PDFS and not FORCE:
-    print(f"{TABLE} ya tiene {already} documentos; se omite el parsing.")
-else:
-    spark.sql(f"""
-        CREATE OR REPLACE TABLE {TABLE}
-        COMMENT 'Salida cruda de ai_parse_document por PDF (catálogo y datasheets)'
-        AS
-        SELECT
-          regexp_extract(path, '[^/]+$', 0)                         AS document_name,
-          CASE WHEN path LIKE '%Catalogo_Comercial%' THEN 'catalog'
-               ELSE 'datasheet' END                                 AS doc_type,
-          ai_parse_document(content)                                AS parsed,
-          path                                                      AS _source_file,
-          current_timestamp()                                       AS _ingested_at,
-          uuid()                                                    AS _ingest_run_id,
-          true                                                      AS is_synthetic
-        FROM read_files('{VOLUME_DIR}', format => 'binaryFile')
-    """)
+## Uso local
 
-# COMMAND ----------
+```bash
+make install     # crea el entorno
+make test        # pruebas
+make lint        # ruff + mypy
+make app         # interfaz Streamlit
+```
 
-display(spark.sql(f"SELECT doc_type, count(*) AS docs FROM {TABLE} GROUP BY doc_type"))
+Copia `.env.example` a `.env` y ajusta los valores (por defecto: retrieval BM25 local y sin LLM).
 
-# COMMAND ----------
+## Despliegue en Databricks
 
-n = spark.table(TABLE).count()
-assert n == EXPECTED_PDFS, f"Se esperaban {EXPECTED_PDFS} documentos parseados y hay {n}"
+```bash
+databricks auth login --host https://<tu-workspace>.cloud.databricks.com
+databricks bundle validate
+databricks bundle deploy -t dev
+databricks bundle run run_all -t dev
+```
+
+El job `run_all` ejecuta:
+
+1. `00_setup` — crea `emerson_hw` con esquemas `bronze`/`silver`/`gold` y el volumen `bronze.raw_files`,
+   y copia los 33 PDFs al volumen.
+2. `01_parse` — parsea los PDFs con `ai_parse_document` a `emerson_hw.bronze.documents_parsed`.
+
+Comprobación:
+
+```sql
+SELECT count(*) FROM emerson_hw.bronze.documents_parsed;  -- 33
+```
+
+Si tu cuenta no permite crear catálogos, usa uno existente:
+`databricks bundle deploy -t dev --var catalog=<catalogo>`.
+
+## Estructura
+
+```
+src/emerson_agent/     lógica (datos, retrieval, compatibilidad, agente, evaluación)
+databricks/notebooks/  notebooks del pipeline
+databricks.yml         bundle y job run_all
+app/                   interfaz Streamlit
+tests/                 pytest
+data/raw/              PDFs fuente
+```
+
+Guía para colaboradores y para Claude Code: [CLAUDE.md](CLAUDE.md).

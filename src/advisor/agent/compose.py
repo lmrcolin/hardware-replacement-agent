@@ -1,0 +1,119 @@
+"""COMPOSE (deterministic draft from structured data) and VERIFY (no invented figures)."""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Iterable, Mapping, Sequence
+from decimal import Decimal
+
+from advisor.models import (
+    CommercialStatus,
+    CompatibilityLevel,
+    CompatibilityResult,
+    Product,
+    Recommendation,
+    RuleOutcome,
+    Severity,
+)
+
+LEVEL_ES = {
+    CompatibilityLevel.COMPATIBLE: "compatible",
+    CompatibilityLevel.COMPATIBLE_WITH_CONDITIONS: "compatible con condiciones",
+    CompatibilityLevel.UNKNOWN: "compatibilidad NO confirmada (faltan datos críticos)",
+    CompatibilityLevel.INCOMPATIBLE: "incompatible",
+}
+STATUS_ES = {
+    CommercialStatus.ACTIVE: "ACTIVE (disponible)",
+    CommercialStatus.DISCONTINUED: "DISCONTINUED (descontinuado)",
+    CommercialStatus.EOL: "EOL (fin de vida)",
+    CommercialStatus.NRND: "NRND (no recomendado para nuevos diseños)",
+}
+_NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
+_PART_LIKE = re.compile(
+    r"\b[A-Z][A-Z0-9]*\d[A-Z0-9]*(?:-[A-Z0-9]+)+\b|\b[A-Z]{2,}\d{3,}[A-Z0-9]*\b"
+)
+
+
+def money(value: Decimal | None) -> str:
+    return f"{value:,.2f} USD" if value is not None else "sin precio"
+
+
+def describe_status(product: Product) -> str:
+    c = product.commercial
+    if c is None:
+        return f"{product.part_number}: sin información comercial en el catálogo."
+    text = f"{product.part_number} ({c.description}, {c.manufacturer}) está {STATUS_ES[c.status]}"
+    if c.discontinued_on:
+        text += f" desde {c.discontinued_on.isoformat()}"
+    if c.last_buy_on:
+        text += f"; última compra {c.last_buy_on.isoformat()}"
+    if c.status is CommercialStatus.ACTIVE:
+        text += f"; precio {money(c.price_usd)}, {c.stock_units} unidades en inventario"
+    elif c.stock_units:
+        text += f"; quedan {c.stock_units} unidades (sin precio de venta vigente)"
+    return text + "."
+
+
+def _recommendation_line(rec: Recommendation) -> str:
+    c = rec.commercial
+    line = (
+        f"{rec.rank}. {rec.product.part_number} — {c.description} ({c.manufacturer}): "
+        f"{LEVEL_ES[rec.compatibility.level]}; {money(c.price_usd)}; {c.stock_units} unidades."
+    )
+    if rec.compatibility.conditions:
+        line += " Condiciones: " + "; ".join(rec.compatibility.conditions) + "."
+    return line
+
+
+def draft_message(
+    original: Product | None,
+    recommendations: Sequence[Recommendation],
+    risky: Sequence[Recommendation],
+    blocked_successors: Mapping[str, CompatibilityResult],
+) -> str:
+    lines: list[str] = []
+    if original is not None:
+        lines.append(describe_status(original))
+    if recommendations:
+        lines.append(
+            "Sustitutos activos recomendados:"
+            if original
+            else "Productos activos que cumplen la consulta:"
+        )
+        lines.extend(_recommendation_line(r) for r in recommendations)
+    else:
+        lines.append(
+            "No hay un sustituto ACTIVE compatible en el catálogo con la evidencia disponible."
+        )
+    if risky:
+        lines.append("Opciones con riesgo (NRND, sin precio de venta vigente):")
+        lines.extend(_recommendation_line(r) for r in risky)
+    for successor, result in blocked_successors.items():
+        fails = [r for r in result.rule_results if r.outcome is RuleOutcome.FAIL]
+        critical = [r.message for r in fails if r.severity is Severity.CRITICAL]
+        reasons = (critical or [r.message for r in fails])[:2]
+        lines.append(
+            f"El datasheet indica {successor} como sucesor, pero no es un reemplazo directo: "
+            + "; ".join(reasons)
+            + "."
+        )
+    return "\n".join(lines)
+
+
+def _numbers(text: str) -> set[str]:
+    out: set[str] = set()
+    for raw in _NUMBER.findall(text):
+        value = raw.replace(",", "").rstrip(".")
+        out.add(value)
+        if "." in value:
+            out.add(value.rstrip("0").rstrip("."))
+    return out
+
+
+def unverified_tokens(text: str, draft: str, known_parts: Iterable[str]) -> list[str]:
+    """Numbers and part-number-like tokens in ``text`` that do not come from the draft/catalog."""
+    allowed_numbers = _numbers(draft)
+    allowed_parts = set(known_parts) | set(_PART_LIKE.findall(draft))
+    bad = [n for n in _numbers(text) if n not in allowed_numbers]
+    bad += [p for p in _PART_LIKE.findall(text) if p not in allowed_parts]
+    return sorted(set(bad))

@@ -46,6 +46,7 @@ from advisor.retrieval import Retriever
 log = logging.getLogger(__name__)
 
 CONFIDENT = 0.85  # minimum PartMatch score to act without asking
+SUGGEST = 0.6  # fuzzy matches above this are offered back, never assumed
 AMBIGUITY_GAP = 0.05  # two matches closer than this → ask which one
 
 
@@ -188,6 +189,11 @@ class AdvisorAgent:
                 run, parsed, f"¿A cuál de estos part numbers te refieres: {options}?"
             )
         if not confident:
+            suggestions = [m.part_number for m in matches if m.score >= SUGGEST][:3]
+            if suggestions:
+                options = " o ".join(suggestions)
+                question = f"No encontré ese part number exacto. ¿Te refieres a {options}?"
+                return self._clarify(run, parsed, question)
             if parsed.category is None or not parsed.requirements:
                 question = parsed.clarification_question or (
                     "¿Qué part number quieres reemplazar o qué requisitos técnicos debe cumplir "

@@ -165,3 +165,10 @@ def test_invented_figures_in_text_fall_back_to_verified_draft(built: BuiltArtifa
     assert "MCX99999-FAKE" not in resp.message and "99.99" not in resp.message
     assert any("no verificados" in w for w in resp.warnings)
     assert resp.llm_provider.endswith("template")
+
+
+@pytest.mark.safety
+def test_typo_is_suggested_never_assumed(built: BuiltArtifacts) -> None:
+    resp = make_agent(built).answer(CustomerQuery(text="Reemplazo para la E81O-CQDA2"))
+    assert resp.original is None and not resp.recommendations
+    assert resp.clarification_question and "E810-CQDA2" in resp.clarification_question

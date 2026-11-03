@@ -131,3 +131,8 @@ def test_candidates_never_include_the_product_or_other_categories(graph: nx.Mult
 def test_unknown_part_raises(graph: nx.MultiDiGraph) -> None:
     with pytest.raises(KeyError):
         candidate_neighbors(graph, "NOPE-123")
+
+
+def test_model_names_from_catalog_descriptions_resolve(graph: nx.MultiDiGraph) -> None:
+    assert resolve_part(graph, "el WD Ultrastar SN860 de 6.4TB")[0].part_number == "WUS4C6464DSP3X5"
+    assert resolve_part(graph, "una AMD MI300X")[0].part_number == "MI300X"

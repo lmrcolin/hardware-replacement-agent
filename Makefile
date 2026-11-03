@@ -39,7 +39,7 @@ pipeline-local: ## Build artifacts locally from data/raw (stubs until implemente
 	$(UV) run advisor-pipeline
 
 eval: ## Run evaluation over evaluation/gold_set.yaml
-	$(UV) run python evaluation/run_eval.py
+	$(UV) run python -m evaluation.run_eval
 
 app: ## Streamlit UI (uses MockAdvisorAgent until the agent exists)
 	$(UV) run streamlit run app/streamlit_app.py

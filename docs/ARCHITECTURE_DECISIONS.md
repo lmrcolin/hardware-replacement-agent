@@ -35,3 +35,13 @@ gitleaks no se distribuye por PyPI; se instala vía pre-commit (binario Go), no 
 
 ## ADR-011 Torch CPU-only (Aceptado)
 `sentence-transformers` arrastra torch; se fija el índice `pytorch-cpu` en `pyproject.toml` para evitar ~GB de CUDA.
+
+## ADR-012 Catálogo comercial con parser determinista, no con `ai_parse_document` (Aceptado)
+**Contexto:** verificado el 2026-11-03 sobre `emerson_hw.bronze.documents_parsed`: `ai_parse_document` transcribió
+`H9HCNNNCPMML` como `H9HCNNCPMML` en la tabla del catálogo (la ficha de SK hynix sí conserva el valor correcto).
+El catálogo es la fuente de verdad de identidad, estado, precio y stock; un carácter perdido rompe el cruce.
+**Decisión:** las filas del catálogo se obtienen con `parsing.parse_catalog` (capa de texto del PDF vía pdfplumber),
+igual en local y en Databricks. `ai_parse_document` se usa para datasheets y chunks, y como verificación cruzada:
+silver debe fallar si algún part number del catálogo no coincide literalmente con el de su datasheet.
+**Consecuencias:** el notebook de silver necesita `pdfplumber` en el entorno serverless (verificar `%pip install`
+con el egress de Free Edition en FEATURE_MATRIX); si no está disponible, se sube `silver.commercial` desde local.

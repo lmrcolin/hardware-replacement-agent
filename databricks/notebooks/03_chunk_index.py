@@ -2,7 +2,8 @@
 # MAGIC %md
 # MAGIC # 03 · chunk_index (K4, B-10)
 # MAGIC Datasheets del volumen → `chunk_document` → `gold.document_chunks` con Change Data Feed
-# MAGIC (requisito de un índice Delta Sync de AI Search). Idempotente (`CREATE OR REPLACE`).
+# MAGIC (requisito de un índice Delta Sync de AI Search). Idempotente: `INSERT OVERWRITE` si ya
+# MAGIC existe (conserva el id de la tabla y no rompe el índice), `CREATE OR REPLACE` si no.
 # MAGIC Requiere el entorno serverless versión 4 (Python 3.12) y el wheel en `bronze.libs`.
 
 # COMMAND ----------
@@ -38,8 +39,14 @@ chunks = [c for r in datasheets for c in chunk_document(parse_document(r))]
 synthetic = bool(
     spark.sql(f"SELECT max(is_synthetic) AS s FROM {TABLES['gold.products'].fqn(CATALOG)}").first().s
 )
+# keep_table_id: CREATE OR REPLACE cambia el id de la tabla y rompe el índice Delta Sync
+# (DIFFERENT_DELTA_TABLE_READ_BY_STREAMING_SOURCE); INSERT OVERWRITE lo conserva.
 count = write_delta_with_spark(
-    spark, CATALOG, SPEC, chunk_rows(chunks, is_synthetic=synthetic, ingested_at=now_utc())
+    spark,
+    CATALOG,
+    SPEC,
+    chunk_rows(chunks, is_synthetic=synthetic, ingested_at=now_utc()),
+    keep_table_id=True,
 )
 spark.sql(f"ALTER TABLE {SPEC.fqn(CATALOG)} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)")
 

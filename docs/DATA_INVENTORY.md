@@ -78,3 +78,8 @@ Otras observaciones de extracción:
 - RP2040: `I2S` aparece solo como ejemplo de lo implementable con PIO (la cita lo muestra).
 - Datasheets sin cabecera `Part Number`/`Manufacturer`/`Category` (E810, A100, ConnectX-7, USB-2627): la identidad
   se toma del catálogo en `join_catalog` (A100 → `A100-SXM4-80GB` por prefijo).
+
+## Verificación en Databricks (2026-11-03)
+- Volumen `/Volumes/emerson_hw/bronze/raw_files/`: 33 PDFs, mismos nombres y tamaños que `data/raw/`.
+- `emerson_hw.bronze.documents_parsed`: 33 filas (32 `datasheet`, 1 `catalog`), sin nulos ni `error_status`.
+- `ai_parse_document` en el catálogo: 31/32 part numbers literales; `H9HCNNNCPMML` aparece como `H9HCNNCPMML` (ADR-012).

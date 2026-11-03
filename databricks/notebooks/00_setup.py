@@ -8,7 +8,9 @@
 
 # ruff: noqa: F821  (spark y dbutils los inyecta Databricks)
 import os
-import shutil
+
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.workspace import ExportFormat
 
 dbutils.widgets.text("catalog", "emerson_hw")
 CATALOG = dbutils.widgets.get("catalog")
@@ -29,11 +31,17 @@ spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.bronze.raw_files")
 repo_root = os.path.abspath(os.path.join(os.getcwd(), "..", ".."))
 src_dir = os.path.join(repo_root, "data", "raw")
 
+# Se descarga con la API de Workspace (SDK) en vez de leer el archivo por el FUSE de /Workspace:
+# en serverless, leer ciertos binarios por FUSE falla con 403 (SSE-C) aunque el archivo esté bien.
+ws = WorkspaceClient()
 src_pdfs = sorted(f for f in os.listdir(src_dir) if f.lower().endswith(".pdf"))
 for name in src_pdfs:
     dst = os.path.join(VOLUME_DIR, name)
     if not os.path.exists(dst):
-        shutil.copy(os.path.join(src_dir, name), dst)
+        with ws.workspace.download(os.path.join(src_dir, name), format=ExportFormat.AUTO) as src:
+            data = src.read()
+        with open(dst, "wb") as out:
+            out.write(data)
 
 in_volume = sorted(f for f in os.listdir(VOLUME_DIR) if f.lower().endswith(".pdf"))
 print(f"PDFs en el repo: {len(src_pdfs)} · PDFs en el volumen: {len(in_volume)}")

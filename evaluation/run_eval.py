@@ -65,6 +65,7 @@ class GoldCase(BaseModel):
     expect_clarification: bool
     clarification_mentions: list[str] = []
     relevant_documents: list[str] = []
+    retrieval_only: bool = False
     verified_by: str | None
     notes: str = ""
 
@@ -91,7 +92,7 @@ class CaseResult:
     resolved: str | None
     resolution_ok: bool | None
     status_ok: bool | None
-    clarification_ok: bool
+    clarification_ok: bool | None
     hit_at_1: bool | None
     reciprocal_rank: float | None
     level_ok: bool | None
@@ -181,6 +182,27 @@ def evaluate_case(
     )
 
 
+def evaluate_retrieval_only(case: GoldCase, docs: list[str]) -> CaseResult:
+    """Semantic-retrieval cases: only the document ranking is scored."""
+    relevant = set(case.relevant_documents)
+    return CaseResult(
+        id=case.id,
+        query=case.query,
+        resolved=None,
+        resolution_ok=None,
+        status_ok=None,
+        clarification_ok=None,
+        hit_at_1=None,
+        reciprocal_rank=None,
+        level_ok=None,
+        recommendations=[],
+        p_at_3=precision_at_k(docs, relevant, 3),
+        p_at_5=precision_at_k(docs, relevant, 5),
+        r_at_5=recall_at_k(docs, relevant, 5),
+        retrieval_rr=reciprocal_rank(docs, relevant),
+    )
+
+
 def _rate(values: list[bool | None]) -> float | None:
     scored = [v for v in values if v is not None]
     return sum(scored) / len(scored) if scored else None
@@ -199,6 +221,12 @@ def summarize(results: list[CaseResult]) -> dict[str, float | int | None]:
         "retrieval_precision_at_5": mean([r.p_at_5 for r in results]),
         "retrieval_recall_at_5": mean([r.r_at_5 for r in results]),
         "retrieval_mrr": mean([r.retrieval_rr for r in results]),
+        "retrieval_mrr_semantic_cases": mean(
+            [r.retrieval_rr for r in results if r.id.startswith("GS-R")]
+        ),
+        "retrieval_recall_at_5_semantic_cases": mean(
+            [r.r_at_5 for r in results if r.id.startswith("GS-R")]
+        ),
         "gate_forbidden_recommendations": sum(len(r.forbidden) for r in results),
         "gate_non_active_recommendations": sum(len(r.non_active) for r in results),
         "gate_price_stock_mismatches": sum(len(r.price_mismatch) for r in results),
@@ -292,8 +320,11 @@ def run(
     for case in gold.cases:
         if case.is_placeholder:
             continue
-        resp = agent.answer(CustomerQuery(text=case.query))
         docs = _document_ranking(retriever, built.document_names, case.query)
+        if case.retrieval_only:
+            results.append(evaluate_retrieval_only(case, docs))
+            continue
+        resp = agent.answer(CustomerQuery(text=case.query))
         results.append(evaluate_case(case, resp, built, docs))
     return summarize(results), results, "+".join(c.name for c in chain)
 

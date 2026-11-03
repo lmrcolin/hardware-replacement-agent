@@ -25,6 +25,8 @@ precio, stock, condiciones de instalación y **citas a datasheet y página**.
 
 - **Solo ACTIVE** se recomienda; NRND aparece aparte como opción con riesgo; DISCONTINUED/EOL nunca.
 - **Ranking:** nivel > requisitos obligatorios cubiertos > puntuación; el stock solo desempata.
+- **Búsqueda:** BM25 local (sin red, por defecto) o **híbrida BM25 + AI Search** (índice vectorial Delta Sync en
+  Databricks, embeddings `databricks-gte-large-en`, fusión RRF); si AI Search no responde, degrada a BM25.
 - **0 USD en APIs:** LLM `template` determinista por defecto; Llama 3.3 (Databricks FMAPI) u Ollama opcionales.
 
 ## Requisitos
@@ -46,6 +48,10 @@ make excel            # cost/emerson_advisor_tco.xlsx (TCO con supuestos editabl
 ```
 
 Reproducción completa local: `scripts/reproduce_from_scratch.sh --local-only`.
+
+Búsqueda híbrida con AI Search (requiere `databricks auth login`):
+`ADVISOR_RETRIEVAL_BACKEND=hybrid ADVISOR_DATABRICKS_PROFILE=<perfil> make app` · comparar motores:
+`uv run python -m evaluation.run_eval --retriever bm25|ai_search|hybrid`.
 
 ## Despliegue en Databricks
 
@@ -83,6 +89,9 @@ Reproducción completa desde un clon limpio: `scripts/reproduce_from_scratch.sh`
 ACTIVE, ningún precio/stock distinto del catálogo, ninguna cifra no verificada). Detalle y limitaciones en
 [evaluation/report.md](evaluation/report.md): el conjunto es pequeño y propio; falta un conjunto ciego
 (`evaluation/blind_set.yaml`, `make eval-blind`).
+
+Búsqueda (32 casos, incluidos 10 descriptivos en español sin part number): Recall@5 BM25 0.88 · AI Search 0.95 ·
+**híbrida 1.00**; MRR 0.83 · 0.73 · **0.86** ([evaluation/report_hybrid.md](evaluation/report_hybrid.md)).
 
 Costos: [docs/COST_MODEL.md](docs/COST_MODEL.md) — TCO año 1 ≈ 14.4 k USD con supuestos editables (precios de
 plataforma POR CONFIRMAR).

@@ -1,15 +1,14 @@
-# Tema "marketplace": barra oscura, página gris claro, tarjetas blancas, acentos naranja/amarillo.
-# Tokens de color en app/components/theme.py (CSS) y aquí (widgets nativos).
+# Tema del agente: neutro y sobrio; el acento verde azulado identifica al agente.
+# Colores de componentes propios en app/components/theme.py.
 [theme]
 base = "light"
-primaryColor = "#E77600"
-backgroundColor = "#EAEDED"
-secondaryBackgroundColor = "#F7F8F8"
-textColor = "#0F1111"
-linkColor = "#007185"
-borderColor = "#D5D9D9"
-font = "Arial, Helvetica, sans-serif"
-baseRadius = "small"
+primaryColor = "#0F766E"
+backgroundColor = "#F6F8FA"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1F2933"
+linkColor = "#0F766E"
+borderColor = "#DDE3E8"
+baseRadius = "medium"
 showWidgetBorder = true
 
 [client]

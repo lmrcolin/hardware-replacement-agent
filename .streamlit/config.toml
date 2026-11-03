@@ -1,0 +1,16 @@
+# Tema "marketplace": barra oscura, página gris claro, tarjetas blancas, acentos naranja/amarillo.
+# Tokens de color en app/components/theme.py (CSS) y aquí (widgets nativos).
+[theme]
+base = "light"
+primaryColor = "#E77600"
+backgroundColor = "#EAEDED"
+secondaryBackgroundColor = "#F7F8F8"
+textColor = "#0F1111"
+linkColor = "#007185"
+borderColor = "#D5D9D9"
+font = "Arial, Helvetica, sans-serif"
+baseRadius = "small"
+showWidgetBorder = true
+
+[client]
+toolbarMode = "minimal"

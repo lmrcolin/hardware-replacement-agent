@@ -46,7 +46,7 @@ uv run streamlit run app/streamlit_app.py   # MockAdvisorAgent
 ```
 - [ ] B-20 `LocalParquetRepository` (luego `DatabricksSQLRepository`)
 - [ ] B-21 UI final sobre `RecommendationResponse`
-- [ ] B-22 `gold_set.yaml` con casos reales verificados + scoring en `run_eval.py`
+- [x] B-22 `gold_set.yaml` con casos reales verificados + scoring en `run_eval.py`
 - [ ] B-23 `build_tco_excel.py`
 - [ ] B-24 Probar `scripts/reproduce_from_scratch.sh` en clon limpio
 - [ ] B-25 DEMO_PLAN + ensayo; `/integration-check` antes de merge a `main`

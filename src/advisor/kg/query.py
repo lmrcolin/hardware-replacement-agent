@@ -31,6 +31,23 @@ def _products(graph: nx.MultiDiGraph) -> dict[str, dict[str, object]]:
     }
 
 
+_QUANTITY = re.compile(r"^\d+(?:\.\d+)?[A-Z/]+$")
+
+
+def _description_aliases(parts: dict[str, dict[str, object]]) -> dict[str, str]:
+    """Model names in catalog descriptions ('SN860', 'MI300X') that identify one product."""
+    owners: dict[str, set[str]] = defaultdict(set)
+    for part, data in parts.items():
+        props = data.get("properties")
+        description = str(props.get("description") or "") if isinstance(props, dict) else ""
+        for token in re.findall(r"[A-Za-z0-9][A-Za-z0-9-]{2,}", description):
+            upper = token.upper()
+            has_both = re.search(r"[A-Z]", upper) and re.search(r"\d", upper)
+            if has_both and len(upper) >= 4 and not _QUANTITY.match(upper):
+                owners[upper].add(part)
+    return {token: next(iter(ps)) for token, ps in owners.items() if len(ps) == 1}
+
+
 def resolve_part(graph: nx.MultiDiGraph, text: str, *, limit: int = 5) -> list[PartMatch]:
     """Exact → normalized → root alias → fuzzy, best first (one entry per part number)."""
     parts = _products(graph)
@@ -49,6 +66,8 @@ def resolve_part(graph: nx.MultiDiGraph, text: str, *, limit: int = 5) -> list[P
     aliases = alias_map(parts)
     for part, _ in find_mentions(text.upper(), {a.upper(): p for a, p in aliases.items()}):
         offer(part, 0.9, "normalized")
+    for part, _ in find_mentions(text.upper(), _description_aliases(parts)):
+        offer(part, 0.9, "kg")
     # Only part-number-like tokens (letters and digits) are fuzzy-matched: "100" in "100 Gigabit"
     # must not resemble "A100".
     tokens = [

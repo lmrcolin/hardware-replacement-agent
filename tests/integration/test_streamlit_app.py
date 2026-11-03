@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -104,3 +105,77 @@ def test_filters_only_hide_never_rerank() -> None:
     other = next(c for c in Category if c is not first.commercial.category)
     assert not Filters(category=other).keep(first)
     assert not Filters(levels=frozenset({CompatibilityLevel.INCOMPATIBLE})).keep(first)
+
+
+def _images():  # type: ignore[no-untyped-def]
+    sys.path.insert(0, str(APP_DIR))
+    from components import images
+
+    return images
+
+
+def test_every_product_gets_an_illustration_matching_its_form_factor() -> None:
+    import base64
+    import xml.etree.ElementTree as ET
+
+    from advisor.pipeline import load_or_build
+
+    images = _images()
+    products = {p.part_number: p for p in load_or_build().products}
+    expected = {
+        "A100-SXM4-80GB": "gpu_module",
+        "RTX-4090": "gpu_card",
+        "WUS4C6464DSP3X5": "ssd_u2",
+        "MZ-V9P2T0": "ssd_m2",
+        "Cortex-A78": "ip_die",
+        "USB-2627": "daq",
+        "AD7606": "qfp",
+        "E810-CQDA2": "nic",
+        "H3A8G32AMR": "hbm",
+    }
+    assert {pn: images.kind(products[pn]) for pn in expected} == expected
+    for product in products.values():
+        svg = images.illustration_svg(product)
+        ET.fromstring(svg)  # well-formed
+        assert product.part_number[:13] in svg
+        src, is_photo = images.image_source(product)
+        if is_photo:  # every bundled photo carries its attribution
+            assert images.photo_credit(product.part_number) is not None
+        else:
+            assert base64.b64decode(src.split(",", 1)[1]).decode() == svg
+
+
+def test_bundled_photos_are_free_licensed_and_attributed() -> None:
+    images = _images()
+    credits = json.loads((images.PHOTOS / "sources.json").read_text(encoding="utf-8"))
+    assert credits, "expected bundled photos"
+    for part_number, credit in credits.items():
+        assert (images.PHOTOS / credit["file"]).is_file()
+        assert credit["file"].startswith(part_number)
+        assert credit["license"].startswith(("CC BY", "CC0", "Public domain"))
+        assert credit["author"] and credit["source_url"].startswith(
+            "https://commons.wikimedia.org/"
+        )
+    # PCIe photos must not stand in for SXM modules (form factor is a critical rule)
+    assert not {"A100-SXM4-80GB", "H100-SXM5"} & credits.keys()
+
+
+def test_real_photo_replaces_the_illustration(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from advisor.models import Product
+
+    images = _images()
+    product = Product(part_number="SYN-PHOTO-1", manufacturer="Synthetic", category=Category.GPU)
+    (tmp_path / "SYN-PHOTO-1.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    monkeypatch.setattr(images, "PHOTOS", tmp_path)
+    monkeypatch.setattr(images, "_CACHE", {})
+    src, is_photo = images.image_source(product)
+    assert is_photo and src.startswith("data:image/png;base64,")
+    assert "Ilustración" not in images.image_html(product)
+
+
+def test_images_show_on_landing_and_results() -> None:
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    assert markdown(at).count('class="pimg pimg-tile"') == 11
+    search(at, OFFICIAL)
+    # original + 2 recommended substitutes
+    assert markdown(at).count('<div class="pimg"><img src="data:image/svg+xml') == 3

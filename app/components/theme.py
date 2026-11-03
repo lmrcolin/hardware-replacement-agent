@@ -91,12 +91,15 @@ header[data-testid="stHeader"] {{ display: none; }}
 }}
 [class*="st-key-card-"] h3 {{ color: {LINK}; font-size: 18px; font-weight: 400; padding: 0; }}
 [class*="st-key-card-"] h3:hover {{ color: {LINK_HOVER}; }}
-.thumb {{
-  aspect-ratio: 1; background: #F7F8F8; border-radius: 4px; display: flex;
-  align-items: center; justify-content: center; flex-direction: column; color: {MUTED};
-  font-size: 12px; text-align: center; padding: 6px;
+.pimg {{ background: #fff; border-radius: 4px; }}
+.pimg img {{
+  width: 100%; height: auto; max-height: 170px; object-fit: contain; display: block; margin: 0 auto;
 }}
-.thumb b {{ font-size: 28px; color: {SUBNAV}; }}
+.pimg-tile img {{ max-height: 160px; object-fit: contain; margin-bottom: 6px; }}
+.pimg-note {{
+  font-size: 10px; color: {MUTED}; text-align: center; line-height: 1.3; margin-top: 3px;
+}}
+.pimg-note a {{ color: {MUTED}; text-decoration: underline; }}
 .choice {{
   display: inline-block; background: {SUBNAV}; color: #fff; font-size: 12px; padding: 3px 8px;
   border-radius: 0 0 4px 0; margin-bottom: 6px;
@@ -138,7 +141,7 @@ header[data-testid="stHeader"] {{ display: none; }}
   .st-key-topbar .account, .st-key-topbar .brand small {{ display: none; }}
   .st-key-topbar [data-testid="stColumn"] {{ margin-bottom: 4px; }}
   .st-key-topbar .brand {{ padding: 8px 0 2px 0; line-height: 1.4; margin-bottom: 1.2rem; }}
-  .thumb {{ display: none; }}
+  .pimg:not(.pimg-tile) img {{ max-width: 170px; }}
   .st-key-category [data-baseweb="select"] > div, .st-key-q [data-baseweb="input"] {{
     border-radius: 4px;
   }}

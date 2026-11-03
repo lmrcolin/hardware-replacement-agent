@@ -25,6 +25,7 @@ from advisor.models import (
     RecommendationResponse,
     RuleOutcome,
 )
+from components.images import image_html
 
 LEVEL_BADGE = {
     CompatibilityLevel.COMPATIBLE: ":green-badge[Compatible]",
@@ -62,18 +63,6 @@ CATEGORY_LABEL = {
     Category.SENSOR: "Sensor",
     Category.STORAGE: "Almacenamiento",
 }
-CATEGORY_ICON = {
-    Category.CPU: "CPU",
-    Category.DAQ: "DAQ",
-    Category.FPGA: "FPGA",
-    Category.GPU: "GPU",
-    Category.MEMORY: "RAM",
-    Category.MICROCONTROLLER: "MCU",
-    Category.NETWORK: "NIC",
-    Category.POWER: "PWR",
-    Category.SENSOR: "SNS",
-    Category.STORAGE: "SSD",
-}
 REPLACE = (CommercialStatus.DISCONTINUED, CommercialStatus.EOL, CommercialStatus.NRND)
 
 
@@ -89,13 +78,6 @@ def _fmt(value: object) -> str:
     if isinstance(value, float):
         return f"{value:g}"
     return str(value)
-
-
-def thumb(category: Category) -> str:
-    return (
-        f'<div class="thumb"><b>{CATEGORY_ICON[category]}</b>'
-        f"{escape(CATEGORY_LABEL[category])}</div>"
-    )
 
 
 def price_html(c: CommercialInformation) -> str:
@@ -118,12 +100,16 @@ def stock_html(c: CommercialInformation) -> str:
 
 
 def replacement_tiles(
-    catalog: Iterable[CommercialInformation], on_pick: Callable[[str], None], *, per_row: int = 4
+    products: Iterable[Product], on_pick: Callable[[str], None], *, per_row: int = 4
 ) -> None:
     """Catalog parts that need a replacement (DISCONTINUED/EOL/NRND) as clickable tiles."""
     parts = sorted(
-        (c for c in catalog if c.status in REPLACE),
-        key=lambda c: (REPLACE.index(c.status), c.category.value, c.part_number),
+        (
+            (REPLACE.index(p.commercial.status), p.category.value, p.part_number, p)
+            for p in products
+            if p.commercial and p.commercial.status in REPLACE
+        ),
+        key=lambda row: row[:3],
     )
     if not parts:
         return
@@ -131,8 +117,11 @@ def replacement_tiles(
     st.caption(f"{len(parts)} piezas DISCONTINUED, EOL o NRND · elige una para buscar sustituto")
     for start in range(0, len(parts), per_row):
         cols = st.columns(per_row)
-        for col, c in zip(cols, parts[start : start + per_row], strict=False):
+        for col, (*_, product) in zip(cols, parts[start : start + per_row], strict=False):
+            c = product.commercial
+            assert c is not None
             with col, st.container(key=f"tile-{c.part_number}"):
+                _html(image_html(product, css_class="pimg pimg-tile"))
                 _html(
                     f'<span class="status-red">{c.status.value}</span> '
                     f'<span class="muted">· {escape(CATEGORY_LABEL[c.category])}</span>'
@@ -178,7 +167,7 @@ def original_card(product: Product) -> None:
     c = product.commercial
     with st.container(key="original"):
         left, mid, right = st.columns([1, 5, 2.2])
-        left.markdown(thumb(product.category), unsafe_allow_html=True)
+        left.markdown(image_html(product), unsafe_allow_html=True)
         with mid:
             st.markdown(f"#### Pieza original: {product.part_number}")
             if c is None:
@@ -224,7 +213,7 @@ def recommendation_card(
     c = rec.commercial
     with st.container(key=f"card-{key}"):
         left, mid, right = st.columns([1, 4.6, 1.8])
-        left.markdown(thumb(c.category), unsafe_allow_html=True)
+        left.markdown(image_html(rec.product), unsafe_allow_html=True)
         with mid:
             if best:
                 _html('<div class="choice">Mejor <span>compatibilidad</span></div>')

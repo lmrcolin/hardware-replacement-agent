@@ -38,7 +38,7 @@ from advisor.models import (
 )
 from advisor.parsing import parse_catalog, parse_document
 from advisor.repository import LocalParquetRepository
-from advisor.retrieval import BM25Retriever
+from advisor.retrieval import AISearchRetriever, BM25Retriever, HybridRetriever, Retriever
 
 log = logging.getLogger(__name__)
 
@@ -147,6 +147,20 @@ def load_or_build(settings: Settings | None = None) -> BuiltArtifacts:
     return load_artifacts(settings) or build_in_memory(settings)
 
 
+def build_retriever(settings: Settings, chunks: list[Chunk]) -> Retriever:
+    """bm25 (default, offline) | ai_search | hybrid (BM25 + AI Search fused with RRF)."""
+    bm25 = BM25Retriever(chunks)
+    backend = settings.retrieval.backend
+    if backend not in ("ai_search", "hybrid"):
+        return bm25
+    ai_search = AISearchRetriever(
+        settings.retrieval.ai_search_endpoint,
+        settings.retrieval.ai_search_index,
+        settings.databricks.profile,
+    )
+    return ai_search if backend == "ai_search" else HybridRetriever([bm25, ai_search])
+
+
 def build_agent(
     settings: Settings | None = None, artifacts: BuiltArtifacts | None = None
 ) -> AdvisorAgent:
@@ -157,7 +171,7 @@ def build_agent(
         graph=artifacts.graph,
         products=artifacts.products,
         commercial=CommercialEngine(artifacts.catalog),
-        retriever=BM25Retriever(artifacts.chunks),
+        retriever=build_retriever(settings, artifacts.chunks),
         llm_chain=build_llm_chain(settings),
         registry=load_spec_registry(_resolve(settings.paths.spec_registry)),
     )

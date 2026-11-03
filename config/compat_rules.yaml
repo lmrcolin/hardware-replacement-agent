@@ -1,6 +1,9 @@
-# Rule declarations only. Evaluation logic lives in src/advisor/compatibility/engine.py (B-15).
-# severity CRITICAL: FAIL ⇒ INCOMPATIBLE; MISSING ⇒ at most UNKNOWN.
-version: "0.1.0"
+# Rule declarations. Evaluation lives in src/advisor/compatibility/engine.py (B-15).
+# The severity below is the rule's default; per requirement it comes from its priority/origin:
+#   query MUST or critical spec of the original → CRITICAL; SHOULD / non-critical spec → MAJOR; NICE → MINOR.
+# Aggregation: CRITICAL FAIL ⇒ INCOMPATIBLE; CRITICAL MISSING ⇒ UNKNOWN;
+#              MAJOR FAIL/MISSING or any CONDITIONAL ⇒ COMPATIBLE_WITH_CONDITIONS; otherwise COMPATIBLE.
+version: "1.0.0"
 rules:
   - id: R-CAT
     name: Same category
@@ -22,6 +25,16 @@ rules:
     description: Supply/input voltage ranges must contain the required ones; power/TDP within the original envelope.
     severity: CRITICAL
     applies_to: [CPU, GPU, Memory, Microcontroller, Power, Sensor, DAQ]
+  - id: R-IFACE
+    name: Host interface
+    description: Same interface family (PCIe, USB). Same generation passes; a newer generation is backward compatible (COMPATIBLE_WITH_CONDITIONS); an older one or another family fails.
+    severity: CRITICAL
+    applies_to: [Network, GPU, DAQ, Storage]
+  - id: R-SPEC
+    name: Categorical spec equality
+    description: Non-physical categorical specs (memory type, architecture, core) must match; otherwise a condition or failure depending on the requirement severity.
+    severity: MAJOR
+    applies_to: ["*"]
   - id: R-NUM-GTE
     name: Numeric capability not lower
     description: Capacity/performance specs (speed, channels, memory, resolution) must be >= the requirement.

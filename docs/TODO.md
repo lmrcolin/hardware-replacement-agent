@@ -156,7 +156,7 @@ BM25, repositorio local, golden set de 22 casos.
 3. Actualiza `docs/COST_MODEL.md` con la tabla de supuestos y cómo cambiarlos.
 - Aceptación: el Excel se abre en LibreOffice y recalcula al cambiar un supuesto.
 
-### L3. UI final (B-21) — rama `feat/ui-final`
+### L3. ✅ UI final (B-21) — rama `feat/ui-final`
 1. Diseño de chat (`st.chat_input` / `st.chat_message`) con historial en `st.session_state`; mantener selector Real/Simulado.
 2. Ficha de la pieza original: estado (badge por estado), fechas de descontinuación/última compra, stock; precio solo si ACTIVE.
 3. Por recomendación: badge de nivel, precio y stock del catálogo, condiciones, **tabla comparativa de specs**

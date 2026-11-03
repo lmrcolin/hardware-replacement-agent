@@ -180,3 +180,20 @@ def test_unknown_candidates_are_shown_as_unverified(built: BuiltArtifacts) -> No
     assert resp.recommendations == []
     assert [r.product.part_number for r in resp.unverified_options] == ["w9-3595X"]
     assert "sin datos suficientes" in resp.message and "w9-3595X" in resp.message
+
+
+@pytest.mark.safety
+def test_agent_degrades_when_semantic_search_is_down(built: BuiltArtifacts) -> None:
+    from advisor.retrieval import HybridRetriever, RetrievalUnavailableError, Retriever
+
+    class Down(Retriever):
+        name = "ai_search"
+
+        def search(self, query, *, top_k=8, filters=None):  # type: ignore[no-untyped-def]
+            raise RetrievalUnavailableError("index not ready")
+
+    agent = make_agent(built)
+    agent.retriever = HybridRetriever([BM25Retriever(built.chunks), Down()])
+    resp = agent.answer(CustomerQuery(text=OFFICIAL))
+    assert [r.product.part_number for r in resp.recommendations] == ["MCX75310AAS-NEAT", "BCM57508"]
+    assert any("solo BM25" in w for w in resp.warnings)

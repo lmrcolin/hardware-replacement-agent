@@ -5,7 +5,7 @@ Rellenar al probar cada capacidad en nuestro workspace. Nada se asume disponible
 | Capacidad | Probado por | Fecha | OK/FAIL | Notas |
 |---|---|---|---|---|
 | `ai_parse_document` sobre `read_files(..., format => 'binaryFile')` | lmrcolin (CLI, solo lectura) | 2026-11-03 | OK con reservas | 33/33 filas en `bronze.documents_parsed`, 0 nulos, 0 `error_status`. **Catálogo: leyó `H9HCNNCPMML` en vez de `H9HCNNNCPMML`** (31/32 part numbers literales). Ver ADR-012 |
-| `ai_query` con Llama 3.3 70B (`databricks-meta-llama-3-3-70b-instruct`) | | | | rate limits / cuota; `DatabricksFMAPIClient` implementado vía `serving_endpoints.query`, **sin probar contra el endpoint real** |
+| Llama 3.3 70B por FMAPI (`databricks-meta-llama-3-3-70b-instruct`, `DatabricksFMAPIClient`) | Kevinvlz | 2026-11-03 | OK con reservas | `run_eval --llm configured` (22 casos): 212 s (~9.6 s/caso) vs 7.5 s con `template`; 1 fallo del proveedor cayó a `template` sin error. **`gate_unverified_text` = 5** (GS-01, GS-04, GS-12, GS-13, GS-15: VERIFY marcó texto no verificado) y calidad menor que `template`: hit@1 0.88 vs 1.00, MRR 0.80 vs 1.00, nivel 0.75 vs 1.00 (p. ej. GS-09 "DAQ USB con 64 canales"). Puertas de prohibidas/no-ACTIVE/precio-stock en 0. Recomendación: demo con `template` hasta ajustar prompt/VERIFY |
 | Ollama local (`qwen3:4b`) | | | | `OllamaClient` implementado (`/api/generate` con `format` JSON schema), **sin probar**; el modelo no está descargado |
 | AI Search (Vector Search) endpoint + índice Delta Sync | | | | 1 endpoint, 1 unidad, sin Direct Vector Access |
 | Databricks Connect (serverless) desde local | | | | alternativa: SQL warehouse (ADR-009) |

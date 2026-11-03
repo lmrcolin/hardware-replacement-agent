@@ -163,7 +163,7 @@ def evaluate_case(
         ],
         price_mismatch=[
             r.product.part_number
-            for r in resp.recommendations + resp.risky_options
+            for r in resp.recommendations + resp.risky_options + resp.unverified_options
             if (r.commercial.price_usd, r.commercial.stock_units)
             != (
                 catalog[r.product.part_number].price_usd,

@@ -70,6 +70,7 @@ def draft_message(
     recommendations: Sequence[Recommendation],
     risky: Sequence[Recommendation],
     blocked_successors: Mapping[str, CompatibilityResult],
+    unverified: Sequence[Recommendation] = (),
 ) -> str:
     lines: list[str] = []
     if original is not None:
@@ -88,6 +89,16 @@ def draft_message(
     if risky:
         lines.append("Opciones con riesgo (NRND, sin precio de venta vigente):")
         lines.extend(_recommendation_line(r) for r in risky)
+    if unverified:
+        lines.append(
+            "Posibles, pero sin datos suficientes para confirmar la compatibilidad "
+            "(requieren validación de un experto):"
+        )
+        for rec in unverified:
+            lines.append(
+                f"- {rec.product.part_number} — {rec.commercial.description}: sin datos de "
+                f"{', '.join(rec.compatibility.missing) or 'requisitos críticos'}."
+            )
     for successor, result in blocked_successors.items():
         fails = [r for r in result.rule_results if r.outcome is RuleOutcome.FAIL]
         critical = [r.message for r in fails if r.severity is Severity.CRITICAL]

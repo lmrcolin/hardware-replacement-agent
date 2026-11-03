@@ -5,7 +5,8 @@ Rellenar al probar cada capacidad en nuestro workspace. Nada se asume disponible
 | Capacidad | Probado por | Fecha | OK/FAIL | Notas |
 |---|---|---|---|---|
 | `ai_parse_document` sobre `read_files(..., format => 'binaryFile')` | lmrcolin (CLI, solo lectura) | 2026-11-03 | OK con reservas | 33/33 filas en `bronze.documents_parsed`, 0 nulos, 0 `error_status`. **Catálogo: leyó `H9HCNNCPMML` en vez de `H9HCNNNCPMML`** (31/32 part numbers literales). Ver ADR-012 |
-| `ai_query` con Llama 3.3 70B (`databricks-meta-llama-3-3-70b-instruct`) | | | | rate limits / cuota |
+| `ai_query` con Llama 3.3 70B (`databricks-meta-llama-3-3-70b-instruct`) | | | | rate limits / cuota; `DatabricksFMAPIClient` implementado vía `serving_endpoints.query`, **sin probar contra el endpoint real** |
+| Ollama local (`qwen3:4b`) | | | | `OllamaClient` implementado (`/api/generate` con `format` JSON schema), **sin probar**; el modelo no está descargado |
 | AI Search (Vector Search) endpoint + índice Delta Sync | | | | 1 endpoint, 1 unidad, sin Direct Vector Access |
 | Databricks Connect (serverless) desde local | | | | alternativa: SQL warehouse (ADR-009) |
 | Statement Execution API en `Serverless Starter Warehouse` (2X-Small) desde el CLI | lmrcolin | 2026-11-03 | OK | lecturas de verificación; arranque en frío ~segundos |

@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from advisor.agent import AdvisorAgent
 from advisor.commercial import CommercialEngine
-from advisor.config import REPO_ROOT, get_settings
+from advisor.config import REPO_ROOT, RetrieverBackend, get_settings
 from advisor.llm import LLMClient, TemplateClient, build_llm_chain
 from advisor.models import (
     CommercialStatus,
@@ -28,8 +28,8 @@ from advisor.models import (
     CustomerQuery,
     RecommendationResponse,
 )
-from advisor.pipeline import BuiltArtifacts, build_in_memory
-from advisor.retrieval import BM25Retriever
+from advisor.pipeline import BuiltArtifacts, build_in_memory, build_retriever
+from advisor.retrieval import RetrievalUnavailableError, Retriever
 from evaluation.metrics import mean, precision_at_k, recall_at_k, reciprocal_rank
 
 GOLD_SET = Path(__file__).with_name("gold_set.yaml")
@@ -65,6 +65,7 @@ class GoldCase(BaseModel):
     expect_clarification: bool
     clarification_mentions: list[str] = []
     relevant_documents: list[str] = []
+    retrieval_only: bool = False
     verified_by: str | None
     notes: str = ""
 
@@ -91,7 +92,7 @@ class CaseResult:
     resolved: str | None
     resolution_ok: bool | None
     status_ok: bool | None
-    clarification_ok: bool
+    clarification_ok: bool | None
     hit_at_1: bool | None
     reciprocal_rank: float | None
     level_ok: bool | None
@@ -106,8 +107,11 @@ class CaseResult:
     retrieval_rr: float | None = None
 
 
-def _document_ranking(retriever: BM25Retriever, names: dict[str, str], query: str) -> list[str]:
-    hits = retriever.search(query, top_k=RETRIEVAL_CHUNKS)
+def _document_ranking(retriever: Retriever, names: dict[str, str], query: str) -> list[str]:
+    try:
+        hits = retriever.search(query, top_k=RETRIEVAL_CHUNKS)
+    except RetrievalUnavailableError:
+        return []
     return [names[h.chunk.document_id] for h in hits]
 
 
@@ -178,6 +182,27 @@ def evaluate_case(
     )
 
 
+def evaluate_retrieval_only(case: GoldCase, docs: list[str]) -> CaseResult:
+    """Semantic-retrieval cases: only the document ranking is scored."""
+    relevant = set(case.relevant_documents)
+    return CaseResult(
+        id=case.id,
+        query=case.query,
+        resolved=None,
+        resolution_ok=None,
+        status_ok=None,
+        clarification_ok=None,
+        hit_at_1=None,
+        reciprocal_rank=None,
+        level_ok=None,
+        recommendations=[],
+        p_at_3=precision_at_k(docs, relevant, 3),
+        p_at_5=precision_at_k(docs, relevant, 5),
+        r_at_5=recall_at_k(docs, relevant, 5),
+        retrieval_rr=reciprocal_rank(docs, relevant),
+    )
+
+
 def _rate(values: list[bool | None]) -> float | None:
     scored = [v for v in values if v is not None]
     return sum(scored) / len(scored) if scored else None
@@ -196,6 +221,12 @@ def summarize(results: list[CaseResult]) -> dict[str, float | int | None]:
         "retrieval_precision_at_5": mean([r.p_at_5 for r in results]),
         "retrieval_recall_at_5": mean([r.r_at_5 for r in results]),
         "retrieval_mrr": mean([r.retrieval_rr for r in results]),
+        "retrieval_mrr_semantic_cases": mean(
+            [r.retrieval_rr for r in results if r.id.startswith("GS-R")]
+        ),
+        "retrieval_recall_at_5_semantic_cases": mean(
+            [r.r_at_5 for r in results if r.id.startswith("GS-R")]
+        ),
         "gate_forbidden_recommendations": sum(len(r.forbidden) for r in results),
         "gate_non_active_recommendations": sum(len(r.non_active) for r in results),
         "gate_price_stock_mismatches": sum(len(r.price_mismatch) for r in results),
@@ -266,11 +297,17 @@ Summary = dict[str, float | int | None]
 
 
 def run(
-    chain: list[LLMClient] | None = None, gold: GoldSet | None = None
+    chain: list[LLMClient] | None = None,
+    gold: GoldSet | None = None,
+    retriever_backend: RetrieverBackend = "bm25",
 ) -> tuple[Summary, list[CaseResult], str]:
     gold = gold or load_gold_set()
     built = build_in_memory()
-    retriever = BM25Retriever(built.chunks)
+    settings = get_settings()
+    settings = settings.model_copy(
+        update={"retrieval": settings.retrieval.model_copy(update={"backend": retriever_backend})}
+    )
+    retriever = build_retriever(settings, built.chunks)
     chain = chain or [TemplateClient()]
     agent = AdvisorAgent(
         graph=built.graph,
@@ -283,8 +320,11 @@ def run(
     for case in gold.cases:
         if case.is_placeholder:
             continue
-        resp = agent.answer(CustomerQuery(text=case.query))
         docs = _document_ranking(retriever, built.document_names, case.query)
+        if case.retrieval_only:
+            results.append(evaluate_retrieval_only(case, docs))
+            continue
+        resp = agent.answer(CustomerQuery(text=case.query))
         results.append(evaluate_case(case, resp, built, docs))
     return summarize(results), results, "+".join(c.name for c in chain)
 
@@ -303,21 +343,27 @@ def main() -> int:
     parser.add_argument(
         "--gold", type=Path, default=GOLD_SET, help="case file (default: evaluation/gold_set.yaml)"
     )
+    parser.add_argument(
+        "--retriever",
+        choices=["bm25", "ai_search", "hybrid"],
+        default="bm25",
+        help="bm25 (offline, default) | ai_search | hybrid (needs ADVISOR_DATABRICKS_PROFILE)",
+    )
     args = parser.parse_args()
     gold = load_gold_set(args.gold)
     if not [c for c in gold.cases if not c.is_placeholder]:
         print(f"{args.gold.name}: sin casos reales todavía (solo PLACEHOLDER); nada que evaluar.")
         return 0
     chain = build_llm_chain(get_settings()) if args.llm == "configured" else None
-    summary, results, provider = run(chain, gold)
-    report = render_markdown(summary, results, provider, args.gold.name)
+    summary, results, provider = run(chain, gold, args.retriever)
+    report = render_markdown(
+        summary, results, f"{provider}` · retriever: `{args.retriever}", args.gold.name
+    )
     print(report)
     if not args.no_report:
-        report_md = (
-            REPORT_MD
-            if args.gold == GOLD_SET
-            else REPORT_MD.with_name(f"report_{args.gold.stem}.md")
-        )
+        suffix = "" if args.gold == GOLD_SET else f"_{args.gold.stem}"
+        suffix += "" if args.retriever == "bm25" else f"_{args.retriever}"
+        report_md = REPORT_MD.with_name(f"report{suffix}.md")
         report_md.write_text(report, encoding="utf-8")
         RESULTS_JSON.parent.mkdir(parents=True, exist_ok=True)
         RESULTS_JSON.write_text(

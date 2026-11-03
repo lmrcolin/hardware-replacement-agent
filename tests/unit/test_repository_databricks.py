@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, BinaryIO
 
@@ -25,6 +26,7 @@ from advisor.models import (
 from advisor.repository import ArtifactRepository, DatabricksSQLError, DatabricksSQLRepository
 from advisor.repository.databricks_sql import (
     TABLES,
+    DeltaTable,
     arrow_table,
     assert_join_is_safe,
     commercial_rows,
@@ -33,6 +35,7 @@ from advisor.repository.databricks_sql import (
     kg_node_rows,
     part_numbers_misread,
     specification_rows,
+    write_delta_with_spark,
 )
 
 AT = datetime(2026, 11, 3, tzinfo=UTC)
@@ -259,3 +262,33 @@ def commercial_rows_fixture(
     commercial_rows: list[CommercialInformation],
 ) -> list[CommercialInformation]:
     return commercial_rows
+
+
+class _FakeSpark:
+    """Records the SQL a notebook would run; the table exists or not depending on ``exists``."""
+
+    def __init__(self, exists: bool, rows: int) -> None:
+        self.sql_log: list[str] = []
+        self.catalog = SimpleNamespace(tableExists=lambda name: exists)
+        self._rows = rows
+
+    def sql(self, statement: str) -> None:
+        self.sql_log.append(statement)
+
+    def table(self, name: str) -> SimpleNamespace:
+        return SimpleNamespace(count=lambda: self._rows)
+
+
+@pytest.mark.parametrize(
+    ("exists", "verb"), [(True, "INSERT OVERWRITE"), (False, "CREATE OR REPLACE")]
+)
+def test_stream_source_table_keeps_its_id_when_rewritten(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exists: bool, verb: str
+) -> None:
+    spec = TABLES["gold.document_chunks"]
+    monkeypatch.setattr(
+        DeltaTable, "staging_path", lambda self, catalog: str(tmp_path / "c.parquet")
+    )
+    spark = _FakeSpark(exists, rows=0)
+    write_delta_with_spark(spark, "emerson_hw", spec, [], keep_table_id=True)
+    assert spark.sql_log[-1].startswith(verb)

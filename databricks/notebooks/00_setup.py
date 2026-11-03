@@ -7,6 +7,8 @@
 # COMMAND ----------
 
 # ruff: noqa: F821  (spark y dbutils los inyecta Databricks)
+import hashlib
+import io
 import os
 
 from databricks.sdk import WorkspaceClient
@@ -65,10 +67,15 @@ wheels = [f for f in os.listdir(os.path.join(repo_root, "dist")) if f.endswith("
 libs = [os.path.join("dist", f) for f in wheels]
 configs = ("spec_registry.yaml", "compat_rules.yaml", "settings.yaml")
 libs += [os.path.join("config", f) for f in configs]
+# Se sube con la Files API (overwrite) y se verifica el hash: sobrescribir por FUSE un archivo que
+# ya existe en el volumen dejaba el contenido anterior (el job instalaba un wheel viejo).
 for rel in libs:
     with ws.workspace.download(os.path.join(repo_root, rel), format=ExportFormat.AUTO) as src:
         data = src.read()
-    with open(os.path.join(LIBS_DIR, os.path.basename(rel)), "wb") as out:
-        out.write(data)
+    target = os.path.join(LIBS_DIR, os.path.basename(rel))
+    ws.files.upload(target, io.BytesIO(data), overwrite=True)
+    written = ws.files.download(target).contents.read()
+    if hashlib.sha256(written).digest() != hashlib.sha256(data).digest():
+        raise RuntimeError(f"{target}: el contenido escrito no coincide con {rel}")
 print("libs:", sorted(os.listdir(LIBS_DIR)))
 assert any(f.endswith(".whl") for f in os.listdir(LIBS_DIR)), "Falta el wheel en bronze.libs"

@@ -78,6 +78,8 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["E501"]
+# Pydantic copies field defaults per instance; RUF012 cannot see Contract -> BaseModel.
+"src/advisor/models/**" = ["RUF012"]
 
 [tool.mypy]
 python_version = "3.12"

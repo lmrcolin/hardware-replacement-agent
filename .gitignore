@@ -27,7 +27,8 @@ artifacts/*
 !artifacts/.gitkeep
 
 # Models / indexes downloaded at runtime
-models/
+# downloaded ML models at repo root only (a bare "models/" would hide src/advisor/models)
+/models/
 *.faiss
 .cache/
 

@@ -54,3 +54,11 @@ def test_example_button_and_history() -> None:
 def test_mock_agent_still_available() -> None:
     at = ask("Necesito una NIC 100GbE con RDMA", agent="Simulado (fixtures)")
     assert any("SYN-NIC-200" in s.value for s in at.subheader)
+
+
+def test_unknown_candidates_have_their_own_section() -> None:
+    at = ask("Necesito reemplazar el Arm Cortex-A78")
+    markdown = " ".join(m.value for m in at.markdown)
+    assert "### Posibles, sin datos suficientes" in markdown
+    assert "### Sustitutos recomendados" not in markdown
+    assert [s.value for s in at.subheader] == ["1. w9-3595X"]

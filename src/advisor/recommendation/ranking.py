@@ -25,8 +25,9 @@ LEVEL_TEXT = {
 
 
 class RankedOutput(NamedTuple):
-    recommendations: list[Recommendation]  # ACTIVE only
+    recommendations: list[Recommendation]  # ACTIVE, COMPATIBLE or WITH_CONDITIONS
     risky_options: list[Recommendation]  # NRND only
+    unverified_options: list[Recommendation]  # ACTIVE but UNKNOWN (ADR-013)
 
 
 def _sort_key(result: CompatibilityResult, product: Product) -> tuple[int, float, float, int, str]:
@@ -87,7 +88,7 @@ def _recommendation(rank: int, result: CompatibilityResult, product: Product) ->
 
 
 def rank(results: Sequence[CompatibilityResult], products: Mapping[str, Product]) -> RankedOutput:
-    """Drops INCOMPATIBLE and DISCONTINUED/EOL candidates; NRND goes to risky_options."""
+    """Drops INCOMPATIBLE and DISCONTINUED/EOL; NRND → risky_options; UNKNOWN → unverified."""
     eligible: list[tuple[CompatibilityResult, Product]] = []
     for result in results:
         product = products.get(result.candidate_part_number)
@@ -105,7 +106,10 @@ def rank(results: Sequence[CompatibilityResult], products: Mapping[str, Product]
         return [(r, p) for r, p in eligible if p.commercial and p.commercial.status is status]
 
     active, nrnd = with_status(CommercialStatus.ACTIVE), with_status(CommercialStatus.NRND)
+    confirmed = [(r, p) for r, p in active if r.level is not CompatibilityLevel.UNKNOWN]
+    unknown = [(r, p) for r, p in active if r.level is CompatibilityLevel.UNKNOWN]
     return RankedOutput(
-        recommendations=[_recommendation(i, r, p) for i, (r, p) in enumerate(active, start=1)],
+        recommendations=[_recommendation(i, r, p) for i, (r, p) in enumerate(confirmed, start=1)],
         risky_options=[_recommendation(i, r, p) for i, (r, p) in enumerate(nrnd, start=1)],
+        unverified_options=[_recommendation(i, r, p) for i, (r, p) in enumerate(unknown, start=1)],
     )

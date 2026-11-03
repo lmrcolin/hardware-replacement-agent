@@ -172,3 +172,11 @@ def test_typo_is_suggested_never_assumed(built: BuiltArtifacts) -> None:
     resp = make_agent(built).answer(CustomerQuery(text="Reemplazo para la E81O-CQDA2"))
     assert resp.original is None and not resp.recommendations
     assert resp.clarification_question and "E810-CQDA2" in resp.clarification_question
+
+
+@pytest.mark.safety
+def test_unknown_candidates_are_shown_as_unverified(built: BuiltArtifacts) -> None:
+    resp = make_agent(built).answer(CustomerQuery(text="Necesito reemplazar el Arm Cortex-A78"))
+    assert resp.recommendations == []
+    assert [r.product.part_number for r in resp.unverified_options] == ["w9-3595X"]
+    assert "sin datos suficientes" in resp.message and "w9-3595X" in resp.message

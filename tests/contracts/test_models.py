@@ -68,7 +68,7 @@ def _result(level: CompatibilityLevel, *rules: RuleResult, cand: str = "B") -> C
 
 
 def test_contract_version_is_semver() -> None:
-    assert CONTRACT_VERSION == "1.0.0"
+    assert CONTRACT_VERSION == "1.1.0"
 
 
 class TestCommercial:
@@ -184,6 +184,26 @@ class TestRecommendationResponse:
         rec = self._rec(products, "SYN-GPU-100", CompatibilityLevel.COMPATIBLE)  # NRND
         with pytest.raises(ValidationError, match="ACTIVE"):
             RecommendationResponse(query=base.query, recommendations=[rec], message="m")
+
+    def test_unknown_is_never_in_recommendations(
+        self, products: dict[str, Product], responses
+    ) -> None:  # type: ignore[no-untyped-def]
+        base = responses["replacement_found"]
+        unknown = self._rec(products, "SYN-NIC-200", CompatibilityLevel.UNKNOWN)
+        with pytest.raises(ValidationError, match="unverified_options"):
+            RecommendationResponse(query=base.query, recommendations=[unknown], message="m")
+        assert RecommendationResponse(query=base.query, unverified_options=[unknown], message="m")
+
+    def test_unverified_options_only_active_unknown(
+        self, products: dict[str, Product], responses
+    ) -> None:  # type: ignore[no-untyped-def]
+        base = responses["replacement_found"]
+        confirmed = self._rec(products, "SYN-NIC-200", CompatibilityLevel.COMPATIBLE)
+        with pytest.raises(ValidationError, match="UNKNOWN only"):
+            RecommendationResponse(query=base.query, unverified_options=[confirmed], message="m")
+        nrnd = self._rec(products, "SYN-GPU-100", CompatibilityLevel.UNKNOWN)
+        with pytest.raises(ValidationError, match="ACTIVE only"):
+            RecommendationResponse(query=base.query, unverified_options=[nrnd], message="m")
 
     def test_risky_options_only_nrnd(self, products: dict[str, Product], responses) -> None:  # type: ignore[no-untyped-def]
         base = responses["replacement_found"]

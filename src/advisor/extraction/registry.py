@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from advisor.models import Category
 
-SpecType = Literal["number", "string", "boolean", "list", "enum"]
+SpecType = Literal["number", "string", "boolean", "list", "range"]
 
 
 class SpecDefinition(BaseModel):
@@ -21,13 +22,40 @@ class SpecDefinition(BaseModel):
     critical: bool = False
     description: str = ""
     aliases: list[str] = []
+    patterns: list[str] = []
+    keywords: list[str] = []
+
+    @field_validator("aliases")
+    @classmethod
+    def _lowercase_aliases(cls, v: list[str]) -> list[str]:
+        return [a.lower() for a in v]
+
+    @field_validator("patterns")
+    @classmethod
+    def _valid_regex(cls, v: list[str]) -> list[str]:
+        for pattern in v:
+            if re.compile(pattern).groups < 1:
+                raise ValueError(f"pattern needs a capture group: {pattern}")
+        return v
+
+    @model_validator(mode="after")
+    def _keywords_only_for_lists(self) -> SpecDefinition:
+        if self.keywords and self.type != "list":
+            raise ValueError("keywords are only valid for type 'list'")
+        if self.type in ("number", "range") and not self.unit:
+            raise ValueError("numeric specs need a unit ('count' for plain counts)")
+        return self
 
 
 class SpecRegistry(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     version: str
+    common: dict[str, SpecDefinition] = {}
     categories: dict[Category, dict[str, SpecDefinition]] = Field(min_length=1)
+
+    def for_category(self, category: Category) -> dict[str, SpecDefinition]:
+        return self.categories.get(category, {})
 
 
 def load_spec_registry(path: Path) -> SpecRegistry:

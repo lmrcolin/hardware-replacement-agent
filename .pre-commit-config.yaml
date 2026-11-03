@@ -11,12 +11,6 @@ repos:
         args: ["--maxkb=2048"]
         exclude: ^data/raw/
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.6
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
 
   # gitleaks is a Go binary (not on PyPI); pre-commit bootstraps it.
   - repo: https://github.com/gitleaks/gitleaks
@@ -24,8 +18,19 @@ repos:
     hooks:
       - id: gitleaks
 
+  # ruff runs from the project venv so the hook and `make lint` use the same version (uv.lock).
   - repo: local
     hooks:
+      - id: ruff
+        name: ruff
+        entry: uv run ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff-format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
       - id: import-linter
         name: import-linter (dependency direction)
         entry: uv run lint-imports

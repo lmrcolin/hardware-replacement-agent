@@ -57,3 +57,29 @@ Inspección: 2026-11-03. Los PDFs no se modifican; viven en `data/raw/`, ruta qu
 7. **Descripción de familia en catálogo:** USB-2627 aparece como "USB-2600 Series Multifunction DAQ".
 8. **Celdas multilínea en el catálogo** (fabricante "Measurement Computing (MCC)" partido en 3 líneas con `-layout`): el parser de tablas debe manejar celdas envueltas; validar contra 32 filas esperadas.
 9. Los datasheets parecen documentos preparados para el reto (1 página, estructura homogénea): no asumir que reflejan las fichas oficiales completas de los fabricantes.
+
+## Contradicciones dentro de los datasheets (detectadas al construir `spec_registry.yaml`)
+
+La extracción da precedencia al bloque **Key Specifications Summary** y cita literalmente su origen; estas
+diferencias con la prosa del mismo PDF no se resuelven automáticamente y conviene mencionarlas en la demo:
+
+| Producto | Prosa | Resumen (valor extraído) |
+|---|---|---|
+| WUS4C6464DSP3X5 (SN860) | seq. read 6.4 GB/s, write 3.4 GB/s | `seq_read: 7100MBs`, `seq_write: 3900MBs` |
+| IR3555MTRPBF | Vin 4.5–15 V, Vout 0.25–3.3 V | `vin: 5-12V`, `vout: 0.25-1.52V` |
+| AGFB014R24A (Agilex 7) | 96 transceivers, 58 Gbps PAM4, PCIe Gen4 | `transceivers: 72`, `speed: 116Gbps`, `pcie5: yes` |
+| BCM57508 | SR-IOV hasta 1,024 VFs | `sriov: 512VFs` |
+
+Otras observaciones de extracción:
+- Los avisos de descontinuación/migración describen **otros** productos (p. ej. el aviso de la E810 habla del IPsec/TLS
+  de la ConnectX-7). Esas secciones se excluyen como fuente de specs del propio producto y se reservan para aristas
+  `MIGRATES_TO` del grafo.
+- La E810 **no** declara offload de IPsec en su datasheet; la ConnectX-7 y la BCM57508 sí.
+- RP2040: `I2S` aparece solo como ejemplo de lo implementable con PIO (la cita lo muestra).
+- Datasheets sin cabecera `Part Number`/`Manufacturer`/`Category` (E810, A100, ConnectX-7, USB-2627): la identidad
+  se toma del catálogo en `join_catalog` (A100 → `A100-SXM4-80GB` por prefijo).
+
+## Verificación en Databricks (2026-11-03)
+- Volumen `/Volumes/emerson_hw/bronze/raw_files/`: 33 PDFs, mismos nombres y tamaños que `data/raw/`.
+- `emerson_hw.bronze.documents_parsed`: 33 filas (32 `datasheet`, 1 `catalog`), sin nulos ni `error_status`.
+- `ai_parse_document` en el catálogo: 31/32 part numbers literales; `H9HCNNNCPMML` aparece como `H9HCNNCPMML` (ADR-012).

@@ -1,64 +1,122 @@
-# Canonical spec keys per category. SKELETON: complete keys/aliases from the real datasheets (B-05).
-# type: number | string | boolean | list | enum ; critical: participates in critical compatibility rules.
-version: "0.1.0"
+# Canonical spec keys per category, derived from the 32 datasheets in data/raw (B-05).
+#
+# Each key is extracted (in this precedence) from:
+#   aliases   - lowercase labels: "Key Specifications Summary" keys (e.g. `rate`) or prose labels ("maximum sampling rate")
+#   patterns  - regexes over the datasheet text; group 1 is the raw value
+#   keywords  - (type list) every keyword found in the text becomes a list item
+# type: number | string | boolean | list | range (range -> <key>_min and <key>_max numbers)
+# unit: canonical unit; values with a convertible unit are converted, incompatible units are discarded.
+# critical: participates in critical compatibility rules (missing ⇒ UNKNOWN, mismatch ⇒ INCOMPATIBLE).
+version: "1.0.0"
+
+common:
+  subcategory:       {type: string, description: "Second part of the datasheet 'Category: X / Y' header"}
+  datasheet_status:  {type: string, aliases: [product status], description: "Informative only; the catalog is the source of truth"}
+  document_revision: {type: string, aliases: [document revision]}
+
 categories:
   CPU:
-    cores:            {unit: count, type: number, critical: false}
-    base_clock:       {unit: GHz, type: number, critical: false}
-    socket:           {unit: null, type: string, critical: true}
-    tdp:              {unit: W, type: number, critical: true}
-    isa:              {unit: null, type: string, critical: true, description: "x86-64, Armv8.2-A, ..."}
+    cores:          {unit: count, type: number, aliases: [cores], patterns: ['(\d+)-core']}
+    threads:        {unit: count, type: number, aliases: [threads], patterns: ['(\d+)-thread']}
+    base_clock:     {unit: GHz, type: number, aliases: [base, base frequency, base clock]}
+    turbo_clock:    {unit: GHz, type: number, aliases: [turbo, max turbo]}
+    l1_cache:       {unit: KB, type: number, aliases: [cache_l1]}
+    l2_cache:       {unit: KB, type: number, aliases: [cache_l2]}
+    l3_cache:       {unit: MB, type: number, aliases: [l3, l3 cache]}
+    memory_channels: {unit: count, type: number, aliases: [ddr5]}
+    pcie_lanes:     {unit: count, type: number, aliases: [pcie5, pcie 5.0]}
+    tdp:            {unit: W, type: number, critical: true, aliases: [tdp]}
+    socket:         {type: string, critical: true, patterns: ['Socket (\w+)']}
+    architecture:   {type: string, aliases: [arch], patterns: ['(Armv[\d.]+-?A)', '(Zen \d)']}
+
   DAQ:
-    analog_inputs:    {unit: count, type: number, critical: true}
-    resolution:       {unit: bit, type: number, critical: true}
-    sample_rate:      {unit: S/s, type: number, critical: true}
-    input_range:      {unit: V, type: list, critical: true}
-    host_interface:   {unit: null, type: string, critical: true, aliases: [bus, connectivity]}
-    digital_io:       {unit: count, type: number, critical: false}
+    analog_inputs:  {unit: count, type: number, critical: true, aliases: [channels], patterns: ['(\d+) single-ended']}
+    resolution:     {unit: bit, type: number, critical: true, aliases: [resolution]}
+    sample_rate:    {unit: S/s, type: number, critical: true, aliases: [rate, maximum sampling rate, maximum sample rate]}
+    analog_outputs: {unit: count, type: number, aliases: [ao], patterns: ['(\w+) (?:\d+-bit )?analog outputs']}
+    digital_io:     {unit: count, type: number, aliases: [dio], patterns: ['(\d+) digital I/O']}
+    counters:       {unit: count, type: number, aliases: [counters], patterns: ['(\w+) (?:\d+-bit )?counter']}
+    host_interface: {type: string, critical: true, aliases: [interface], patterns: ['(USB \d\.\d)']}
+    simultaneous:   {type: boolean, aliases: [simultaneous]}
+    supply_voltage: {unit: V, type: number, aliases: [supply]}
+
   FPGA:
-    logic_cells:      {unit: count, type: number, critical: true}
-    transceiver_rate: {unit: Gb/s, type: number, critical: false}
-    block_ram:        {unit: Mb, type: number, critical: false}
-    package:          {unit: null, type: string, critical: true}
+    logic_cells:      {unit: count, type: number, critical: true, aliases: [logic_cells], patterns: ['([\d.,]+ million) logic elements', '([\d,]+) logic cells', '([\d,]+) LUTs']}
+    block_ram:        {unit: Kb, type: number, aliases: [bram]}
+    dsp_blocks:       {unit: count, type: number, aliases: [dsp]}
+    transceivers:     {unit: count, type: number, aliases: [transceivers]}
+    transceiver_rate: {unit: Gb/s, type: number, aliases: [speed]}
+    user_io:          {unit: count, type: number, aliases: [io]}
+    process:          {type: string, aliases: [process]}
+    package:          {type: string, aliases: [package, package options]}
+
   GPU:
-    memory_size:      {unit: GB, type: number, critical: true}
-    memory_type:      {unit: null, type: string, critical: false}
-    memory_bandwidth: {unit: GB/s, type: number, critical: false}
-    form_factor:      {unit: null, type: enum, critical: true, description: "SXM, OAM, PCIe..."}
-    tdp:              {unit: W, type: number, critical: true}
-    interconnect:     {unit: null, type: list, critical: false}
+    memory_size:      {unit: GB, type: number, critical: true, aliases: [memory, hbm2e memory, hbm3 memory, hbm3], patterns: ['(\d+ GB) GDDR']}
+    memory_type:      {type: string, patterns: ['\b(HBM\de?|GDDR\dX?)\b']}
+    memory_bandwidth: {unit: GB/s, type: number, aliases: [bw, memory bandwidth], patterns: ['([\d,]+ GB/s) bandwidth']}
+    fp64:             {unit: TFLOPS, type: number, aliases: [fp64, peak fp64]}
+    fp32:             {unit: TFLOPS, type: number, aliases: [fp32, peak fp32]}
+    cuda_cores:       {unit: count, type: number, aliases: [cuda, cuda cores]}
+    tdp:              {unit: W, type: number, critical: true, aliases: [tdp]}
+    host_interface:   {type: string, aliases: [pcie, host interface], patterns: ['(PCIe Gen\d x\d+)']}
+    form_factor:      {type: list, critical: true, aliases: [form factor, form factors]}
+    interconnect:     {type: list, keywords: [NVLink, NVSwitch, Infinity Fabric]}
+
   Memory:
-    memory_type:      {unit: null, type: string, critical: true}
-    density:          {unit: Gb, type: number, critical: true}
-    data_rate:        {unit: MT/s, type: number, critical: false}
-    voltage:          {unit: V, type: number, critical: true}
+    memory_type:  {type: string, critical: true, patterns: ['\b(LPDDR5X|DDR5|HBM3)\b']}
+    capacity:     {unit: GB, type: number, critical: true, aliases: [capacity, density]}
+    data_rate:    {unit: MT/s, type: number, aliases: [speed]}
+    voltage:      {unit: V, type: number, critical: true, aliases: [voltage, vdd/vddq]}
+    bandwidth:    {unit: GB/s, type: number, aliases: [bw]}
+    ecc:          {type: string, aliases: [ecc, on-die ecc]}
+    package:      {type: string, aliases: [package]}
+
   Microcontroller:
-    core:             {unit: null, type: string, critical: false}
-    clock:            {unit: MHz, type: number, critical: false}
-    flash:            {unit: KB, type: number, critical: true}
-    sram:             {unit: KB, type: number, critical: true}
-    supply_voltage:   {unit: V, type: list, critical: true}
-    package:          {unit: null, type: string, critical: true}
+    core:           {type: string, critical: true, aliases: [core, cores]}
+    clock:          {unit: MHz, type: number, aliases: [freq]}
+    flash:          {unit: KB, type: number, aliases: [flash]}
+    sram:           {unit: KB, type: number, critical: true, aliases: [sram]}
+    gpio:           {unit: count, type: number, aliases: [gpio]}
+    usb:            {type: string, aliases: [usb]}
+    wireless:       {type: list, keywords: [Wi-Fi, Bluetooth]}
+    interfaces:     {type: list, keywords: [UART, SPI, I2C, I2S, CAN, FDCAN, Ethernet]}
+    supply_voltage: {unit: V, type: range, aliases: [supply], description: "Only stated by some datasheets"}
+    package:        {type: string, aliases: [package]}
+
   Network:
-    port_speed:       {unit: Gb/s, type: number, critical: true}
-    ports:            {unit: count, type: number, critical: false}
-    host_interface:   {unit: null, type: string, critical: true}
-    rdma:             {unit: null, type: list, critical: false, description: "RoCE v2, iWARP"}
-    offloads:         {unit: null, type: list, critical: false, description: "IPsec, TLS, VXLAN..."}
-    connector:        {unit: null, type: string, critical: true}
+    port_speed:     {unit: Gb/s, type: number, critical: true, aliases: [speed, port speed, port configuration]}
+    ports:          {unit: count, type: number, aliases: [ports]}
+    host_interface: {type: string, critical: true, aliases: [pcie, host interface], patterns: ['(PCIe \d\.\d x\d+) host interface']}
+    sriov_vfs:      {unit: count, type: number, aliases: [sriov, sr-iov]}
+    rdma:           {type: list, keywords: [RoCE v2, iWARP, InfiniBand]}
+    offloads:       {type: list, keywords: [IPsec, TLS, VXLAN, GENEVE, NVGRE, GRE, OVS, NVMe-oF]}
+    connector:      {type: string, patterns: ['\b(QSFP\d+)\b']}
+    tdp:            {unit: W, type: number, aliases: [tdp]}
+
   Power:
-    input_voltage:    {unit: V, type: list, critical: true}
-    output_current:   {unit: A, type: number, critical: true}
-    function:         {unit: null, type: string, critical: true}
-    package:          {unit: null, type: string, critical: true}
+    output_current:      {unit: A, type: number, critical: true, aliases: [current, continuous output current]}
+    input_voltage:       {unit: V, type: range, critical: true, aliases: [vin, input voltage]}
+    output_voltage:      {unit: V, type: range, critical: true, aliases: [vout, output voltage]}
+    switching_frequency: {unit: kHz, type: range, aliases: [freq]}
+    efficiency:          {unit: pct, type: number, aliases: [efficiency, peak efficiency]}
+    phases:              {unit: count, type: number, aliases: [phases]}
+    power_delivery:      {unit: W, type: number, aliases: [power_delivery]}
+    usb_pd:              {type: string, aliases: [usb_pd]}
+    interface:           {type: string, aliases: [interface]}
+    package:             {type: string, aliases: [package]}
+
   Sensor:
-    measurands:       {unit: null, type: list, critical: true}
-    interface:        {unit: null, type: list, critical: true, description: "I2C, SPI"}
-    supply_voltage:   {unit: V, type: list, critical: true}
-    package:          {unit: null, type: string, critical: false}
+    measurands: {type: list, critical: true, keywords: [gas, pressure, humidity, temperature, gyroscope, accelerometer]}
+    interface:  {type: list, critical: true, keywords: [I2C, SPI]}
+    dof:        {type: string, aliases: [dof]}
+    package:    {type: string, patterns: ['\b(LGA|QFN)\b']}
+
   Storage:
-    capacity:         {unit: TB, type: number, critical: true}
-    interface:        {unit: null, type: string, critical: true}
-    form_factor:      {unit: null, type: string, critical: true}
-    seq_read:         {unit: MB/s, type: number, critical: false}
-    endurance:        {unit: DWPD, type: number, critical: false}
+    capacity:    {unit: TB, type: number, critical: true, aliases: [capacity]}
+    interface:   {type: string, critical: true, aliases: [interface]}
+    form_factor: {type: string, critical: true, patterns: ['\b(U\.2|M\.2)\b']}
+    seq_read:    {unit: MB/s, type: number, aliases: [seq_read, sequential read]}
+    seq_write:   {unit: MB/s, type: number, aliases: [seq_write, sequential write]}
+    rand_read:   {unit: IOPS, type: number, aliases: [rand_read]}
+    endurance:   {unit: DWPD, type: number, aliases: [endurance]}
+    nand:        {type: string, aliases: [nand]}

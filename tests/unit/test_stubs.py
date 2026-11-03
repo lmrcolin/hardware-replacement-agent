@@ -73,14 +73,12 @@ def bare(p: Product) -> Product:
 
 
 # ---------- Datos ----------
-@pending("B-04")
 def test_discover_documents_finds_33_pdfs() -> None:
     docs = ingestion.discover_documents(PDF_DIR)
     assert len(docs) == 33
     assert sum(d.doc_type is DocumentType.CATALOG for d in docs) == 1
 
 
-@pending("B-03")
 def test_parse_catalog_returns_32_rows_with_expected_statuses() -> None:
     rows = parsing.parse_catalog(record(CATALOG, DocumentType.CATALOG))
     assert len(rows) == 32
@@ -94,7 +92,6 @@ def test_parse_catalog_returns_32_rows_with_expected_statuses() -> None:
     assert all(r.price_usd is None for r in rows if r.status is not CommercialStatus.ACTIVE)
 
 
-@pending("B-04")
 def test_parse_document_reads_datasheet() -> None:
     doc = parsing.parse_document(
         record(PDF_DIR / "Intel_E810_100GbE_NIC.pdf", DocumentType.DATASHEET)
@@ -102,7 +99,6 @@ def test_parse_document_reads_datasheet() -> None:
     assert doc.pages and "E810" in doc.pages[0].text
 
 
-@pending("B-06")
 def test_extract_product_attaches_evidence() -> None:
     registry = extraction.load_spec_registry(ROOT / "config" / "spec_registry.yaml")
     product = extraction.extract_product(SYNTH_DOC, registry)
@@ -110,7 +106,6 @@ def test_extract_product_attaches_evidence() -> None:
     assert all(s.evidence for s in product.specifications if s.value is not None)
 
 
-@pending("B-07")
 def test_join_catalog_matches_all(
     products: dict[str, Product], commercial_rows: list[CommercialInformation]
 ) -> None:
@@ -119,7 +114,6 @@ def test_join_catalog_matches_all(
     assert all(p.commercial is not None for p in joined)
 
 
-@pending("B-08")
 def test_chunk_ids_are_stable() -> None:
     first = chunking.chunk_document(SYNTH_DOC)
     assert first and [c.chunk_id for c in first] == [

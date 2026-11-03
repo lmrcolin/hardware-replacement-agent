@@ -1,0 +1,28 @@
+# Non-secret runtime settings. Environment overrides: ADVISOR_* (see .env.example).
+databricks:
+  profile: emerson
+  catalog: datathon
+  schema: emerson
+  volume: raw
+  volume_pdf_dir: /Volumes/datathon/emerson/raw/pdfs
+  warehouse_id: null            # set via ADVISOR_DATABRICKS_WAREHOUSE_ID
+
+paths:
+  pdf_dir: datos/pdfs
+  artifacts_dir: artifacts
+  spec_registry: config/spec_registry.yaml
+  compat_rules: config/compat_rules.yaml
+
+llm:
+  providers: [databricks, ollama, template]   # fallback order
+  databricks_endpoint: databricks-meta-llama-3-3-70b-instruct
+  ollama_model: "qwen3:4b"
+  ollama_host: http://localhost:11434
+  timeout_s: 30
+
+retrieval:
+  backend: bm25                 # bm25 | faiss | hybrid | ai_search
+  top_k: 8
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+
+repository_backend: local       # local | databricks_sql

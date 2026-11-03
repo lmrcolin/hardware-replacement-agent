@@ -1,0 +1,39 @@
+# Rule declarations only. Evaluation logic lives in src/advisor/compatibility/engine.py (B-15).
+# severity CRITICAL: FAIL ⇒ INCOMPATIBLE; MISSING ⇒ at most UNKNOWN.
+version: "0.1.0"
+rules:
+  - id: R-CAT
+    name: Same category
+    description: Candidate must belong to the same catalog category as the original.
+    severity: CRITICAL
+    applies_to: ["*"]
+  - id: R-FF
+    name: Form factor / package
+    description: Physical form factor, connector or package must match (adapters make it conditional, never silent).
+    severity: CRITICAL
+    applies_to: [GPU, Storage, Network, Microcontroller, FPGA, Power, Sensor]
+  - id: R-MUST-PROTO
+    name: Mandatory protocols and features
+    description: Every MUST protocol/feature requested (e.g. RDMA, IPsec offload, I2C) must be present (HAS).
+    severity: CRITICAL
+    applies_to: ["*"]
+  - id: R-ELEC
+    name: Electrical compatibility
+    description: Supply/input voltage ranges must contain the required ones; power/TDP within the original envelope.
+    severity: CRITICAL
+    applies_to: [CPU, GPU, Memory, Microcontroller, Power, Sensor, DAQ]
+  - id: R-NUM-GTE
+    name: Numeric capability not lower
+    description: Capacity/performance specs (speed, channels, memory, resolution) must be >= the requirement.
+    severity: MAJOR
+    applies_to: ["*"]
+  - id: R-UPGRADE
+    name: Acceptable upgrade
+    description: Higher capability that changes integration (e.g. 100GbE → 200/400GbE, PCIe gen) yields COMPATIBLE_WITH_CONDITIONS with explicit conditions.
+    severity: MINOR
+    applies_to: ["*"]
+  - id: R-MISSING
+    name: Missing data
+    description: A required spec absent in the candidate's evidence is reported as missing; never treated as a match.
+    severity: CRITICAL
+    applies_to: ["*"]

@@ -1,0 +1,64 @@
+# Canonical spec keys per category. SKELETON: Dev1 completes keys/aliases from the real datasheets (B-05).
+# type: number | string | boolean | list | enum ; critical: participates in critical compatibility rules.
+version: "0.1.0"
+categories:
+  CPU:
+    cores:            {unit: count, type: number, critical: false}
+    base_clock:       {unit: GHz, type: number, critical: false}
+    socket:           {unit: null, type: string, critical: true}
+    tdp:              {unit: W, type: number, critical: true}
+    isa:              {unit: null, type: string, critical: true, description: "x86-64, Armv8.2-A, ..."}
+  DAQ:
+    analog_inputs:    {unit: count, type: number, critical: true}
+    resolution:       {unit: bit, type: number, critical: true}
+    sample_rate:      {unit: S/s, type: number, critical: true}
+    input_range:      {unit: V, type: list, critical: true}
+    host_interface:   {unit: null, type: string, critical: true, aliases: [bus, connectivity]}
+    digital_io:       {unit: count, type: number, critical: false}
+  FPGA:
+    logic_cells:      {unit: count, type: number, critical: true}
+    transceiver_rate: {unit: Gb/s, type: number, critical: false}
+    block_ram:        {unit: Mb, type: number, critical: false}
+    package:          {unit: null, type: string, critical: true}
+  GPU:
+    memory_size:      {unit: GB, type: number, critical: true}
+    memory_type:      {unit: null, type: string, critical: false}
+    memory_bandwidth: {unit: GB/s, type: number, critical: false}
+    form_factor:      {unit: null, type: enum, critical: true, description: "SXM, OAM, PCIe..."}
+    tdp:              {unit: W, type: number, critical: true}
+    interconnect:     {unit: null, type: list, critical: false}
+  Memory:
+    memory_type:      {unit: null, type: string, critical: true}
+    density:          {unit: Gb, type: number, critical: true}
+    data_rate:        {unit: MT/s, type: number, critical: false}
+    voltage:          {unit: V, type: number, critical: true}
+  Microcontroller:
+    core:             {unit: null, type: string, critical: false}
+    clock:            {unit: MHz, type: number, critical: false}
+    flash:            {unit: KB, type: number, critical: true}
+    sram:             {unit: KB, type: number, critical: true}
+    supply_voltage:   {unit: V, type: list, critical: true}
+    package:          {unit: null, type: string, critical: true}
+  Network:
+    port_speed:       {unit: Gb/s, type: number, critical: true}
+    ports:            {unit: count, type: number, critical: false}
+    host_interface:   {unit: null, type: string, critical: true}
+    rdma:             {unit: null, type: list, critical: false, description: "RoCE v2, iWARP"}
+    offloads:         {unit: null, type: list, critical: false, description: "IPsec, TLS, VXLAN..."}
+    connector:        {unit: null, type: string, critical: true}
+  Power:
+    input_voltage:    {unit: V, type: list, critical: true}
+    output_current:   {unit: A, type: number, critical: true}
+    function:         {unit: null, type: string, critical: true}
+    package:          {unit: null, type: string, critical: true}
+  Sensor:
+    measurands:       {unit: null, type: list, critical: true}
+    interface:        {unit: null, type: list, critical: true, description: "I2C, SPI"}
+    supply_voltage:   {unit: V, type: list, critical: true}
+    package:          {unit: null, type: string, critical: false}
+  Storage:
+    capacity:         {unit: TB, type: number, critical: true}
+    interface:        {unit: null, type: string, critical: true}
+    form_factor:      {unit: null, type: string, critical: true}
+    seq_read:         {unit: MB/s, type: number, critical: false}
+    endurance:        {unit: DWPD, type: number, critical: false}

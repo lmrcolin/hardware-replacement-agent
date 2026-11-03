@@ -202,7 +202,6 @@ def test_agent_recommends_only_active(
 
 
 # ---------- Producto ----------
-@pending("B-20")
 def test_local_repository_roundtrip(products: dict[str, Product], tmp_path: Path) -> None:
     repo = LocalParquetRepository(tmp_path)
     repo.save_products(list(products.values()))

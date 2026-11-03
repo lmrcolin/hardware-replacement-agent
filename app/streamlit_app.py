@@ -12,9 +12,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from components.render import response_view
 from mock_agent import MockAdvisorAgent
 
-from advisor.agent import Advisor
+from advisor.agent import Advisor, AdvisorAgent
 from advisor.models import CustomerQuery
-from advisor.pipeline import BuiltArtifacts, build_agent, load_or_build
+from advisor.pipeline import (
+    BuiltArtifacts,
+    build_agent,
+    evidence_sources,
+    load_or_build,
+    retrieval_status,
+)
 
 REAL, MOCK = "Real (catálogo + datasheets)", "Simulado (fixtures)"
 EXAMPLES = {
@@ -40,6 +46,12 @@ def get_agent(kind: str) -> Advisor:
     return MockAdvisorAgent() if kind == MOCK else build_agent(artifacts=get_artifacts())
 
 
+@st.cache_resource(show_spinner="Comprobando la búsqueda…")
+def get_retrieval_status(kind: str) -> str:
+    agent = get_agent(kind)
+    return retrieval_status(agent.retriever) if isinstance(agent, AdvisorAgent) else "fixtures"
+
+
 st.set_page_config(page_title="Emerson Replacement Advisor", layout="wide")
 st.title("Emerson Replacement Advisor")
 st.caption(
@@ -53,11 +65,18 @@ with st.sidebar:
     kind = st.radio("Agente", [REAL, MOCK])
     st.markdown("**Ejemplos**")
     for label, text in EXAMPLES.items():
-        if st.button(label, use_container_width=True):
+        if st.button(label, width="stretch"):
             st.session_state["pending"] = text
     if st.button("Limpiar conversación", type="secondary"):
         history.clear()
     agent = get_agent(kind)
+    st.markdown("**Fuentes en uso**")
+    if isinstance(agent, AdvisorAgent):
+        st.caption(f"Datos: {get_artifacts().source}")
+        st.caption(f"Búsqueda: {get_retrieval_status(kind)}")
+        st.caption(f"LLM: {' → '.join(c.name for c in agent.llm_chain)}")
+    else:
+        st.caption("Datos: fixtures sintéticos (agente simulado)")
     trace = getattr(agent, "last_trace", [])
     if trace:
         st.markdown("**Pasos del último análisis**")
@@ -68,13 +87,18 @@ prompt = st.chat_input("Describe la pieza a reemplazar o lo que necesitas")
 prompt = prompt or st.session_state.pop("pending", None)
 if prompt:
     response = agent.answer(CustomerQuery(text=prompt.strip()))
-    history.append((prompt, response))
+    retriever = agent.retriever if isinstance(agent, AdvisorAgent) else None
+    found_by = evidence_sources(retriever) if retriever is not None else None
+    history.append((prompt, response, found_by))
 
 if not history:
     st.info("Escribe una consulta o elige un ejemplo en la barra lateral.")
-for question, response in history:
+for question, response, found_by in history:
     with st.chat_message("user"):
         st.write(question)
     with st.chat_message("assistant"):
         response_view(response, names)
-        st.caption(f"Redacción: {response.llm_provider} · contrato {response.contract_version}")
+        detail = f"Redacción: {response.llm_provider}"
+        if found_by:
+            detail += f" · evidencia recuperada por: {found_by}"
+        st.caption(f"{detail} · contrato {response.contract_version}")

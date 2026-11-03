@@ -1,7 +1,7 @@
 UV ?= uv
 PROFILE ?= emerson
 
-.PHONY: help setup install check lint format imports typecheck test test-contracts pipeline-local eval eval-blind app excel clean
+.PHONY: help setup install check lint format imports typecheck test test-contracts pipeline-local eval eval-blind eval-databricks app app-databricks excel clean
 
 help:
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -46,6 +46,15 @@ eval-blind: ## Run evaluation over the blind set (evaluation/blind_set.yaml)
 
 app: ## Streamlit chat UI over the real agent (artifacts/ or in-memory build)
 	$(UV) run streamlit run app/streamlit_app.py
+
+DATABRICKS_ENV = ADVISOR_DATABRICKS_PROFILE=$(PROFILE) ADVISOR_REPOSITORY_BACKEND=databricks_sql \
+	ADVISOR_RETRIEVAL_BACKEND=hybrid ADVISOR_LLM_PROVIDERS=databricks,template
+
+app-databricks: ## Chat UI fully on Databricks: Delta tables, AI Search, Llama (PROFILE=lmrcolin)
+	$(DATABRICKS_ENV) $(UV) run streamlit run app/streamlit_app.py
+
+eval-databricks: ## Evaluation fully on Databricks (Delta + hybrid search + Llama), no report rewrite
+	$(DATABRICKS_ENV) $(UV) run python -m evaluation.run_eval --retriever hybrid --llm configured --no-report
 
 excel: ## Build TCO workbook into cost/
 	$(UV) run python scripts/build_tco_excel.py

@@ -100,7 +100,7 @@ def recommendation_card(rec: Recommendation, names: dict[str, str]) -> None:
                 "**Condiciones**\n" + "\n".join(f"- {x}" for x in rec.compatibility.conditions)
             )
         with st.expander("Comparación de especificaciones"):
-            st.dataframe(comparison_table(rec), hide_index=True, use_container_width=True)
+            st.dataframe(comparison_table(rec), hide_index=True, width="stretch")
         with st.expander(f"Evidencia ({len(rec.evidence)} citas)"):
             for ev in rec.evidence:
                 source = names.get(ev.document_id, ev.document_id[:12])

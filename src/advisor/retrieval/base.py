@@ -181,6 +181,7 @@ class HybridRetriever(Retriever):
         self.retrievers = list(retrievers)
         self.k = k
         self.last_errors: list[str] = []
+        self.last_sources: dict[str, int] = {}  # retriever name -> final hits it contributed
 
     def search(
         self, query: str, *, top_k: int = 8, filters: Mapping[str, str] | None = None
@@ -188,6 +189,7 @@ class HybridRetriever(Retriever):
         self.last_errors = []
         fused: dict[str, float] = {}
         chunks: dict[str, Chunk] = {}
+        found_by: dict[str, set[str]] = {}
         answered = 0
         for retriever in self.retrievers:
             try:
@@ -200,9 +202,13 @@ class HybridRetriever(Retriever):
                 cid = hit.chunk.chunk_id
                 fused[cid] = fused.get(cid, 0.0) + 1.0 / (self.k + rank)
                 chunks.setdefault(cid, hit.chunk)
+                found_by.setdefault(cid, set()).add(retriever.name)
         if not answered:
             raise RetrievalUnavailableError("; ".join(self.last_errors))
         ranked = sorted(fused, key=lambda cid: (-fused[cid], cid))[:top_k]
+        self.last_sources = {
+            r.name: sum(r.name in found_by[cid] for cid in ranked) for r in self.retrievers
+        }
         return [
             ChunkHit(chunk=chunks[c], score=round(fused[c], 6), retriever=self.name) for c in ranked
         ]

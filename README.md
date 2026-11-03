@@ -49,6 +49,18 @@ make excel            # cost/emerson_advisor_tco.xlsx (TCO con supuestos editabl
 
 Reproducción completa local: `scripts/reproduce_from_scratch.sh --local-only`.
 
+### Todo en Databricks
+
+```bash
+databricks bundle deploy -t dev --profile lmrcolin
+databricks bundle run run_all -t dev --profile lmrcolin   # 00 → 07: bronze, silver, gold, grafo, matriz, AI Search
+make app-databricks PROFILE=lmrcolin    # datos en vivo de emerson_hw.gold.* (SQL warehouse) + AI Search + Llama
+make eval-databricks PROFILE=lmrcolin   # la misma evaluación, todo pasando por Databricks
+```
+
+La barra lateral de la app muestra **Fuentes en uso** (comprobadas, no solo configuradas): origen de los datos,
+estado real de AI Search y cadena de LLM; cada respuesta indica qué motor aportó la evidencia y quién redactó.
+
 Búsqueda híbrida con AI Search (requiere `databricks auth login`):
 `ADVISOR_RETRIEVAL_BACKEND=hybrid ADVISOR_DATABRICKS_PROFILE=<perfil> make app` · comparar motores:
 `uv run python -m evaluation.run_eval --retriever bm25|ai_search|hybrid`.

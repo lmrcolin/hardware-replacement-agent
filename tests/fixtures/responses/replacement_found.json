@@ -1,5 +1,5 @@
 {
-  "contract_version": "1.0.0",
+  "contract_version": "1.1.0",
   "query": {
     "text": "Necesito una NIC de 100 GbE con RDMA e IPsec offload. Usábamos la SYN-NIC-100.",
     "language": "es",
@@ -329,6 +329,7 @@
     }
   ],
   "risky_options": [],
+  "unverified_options": [],
   "clarification_question": null,
   "message": "SYN-NIC-100 está DISCONTINUED. Sustituto activo: SYN-NIC-200 (900.00 USD, 40 unidades).",
   "llm_provider": "template",

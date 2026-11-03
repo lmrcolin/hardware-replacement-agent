@@ -34,13 +34,19 @@ class Recommendation(Contract):
         return self
 
 
+CONFIRMED_LEVELS = (CompatibilityLevel.COMPATIBLE, CompatibilityLevel.COMPATIBLE_WITH_CONDITIONS)
+
+
 class RecommendationResponse(Contract):
     contract_version: str = CONTRACT_VERSION
     query: CustomerQuery
     parsed_query: ParsedQuery | None = None
     original: Product | None = None
-    recommendations: list[Recommendation] = []  # ACTIVE only
+    recommendations: list[Recommendation] = []  # ACTIVE and COMPATIBLE / WITH_CONDITIONS only
     risky_options: list[Recommendation] = []  # NRND only
+    # ACTIVE candidates whose critical data is missing (UNKNOWN): never presented as recommended
+    # (ADR-013); they need expert validation.
+    unverified_options: list[Recommendation] = []
     clarification_question: str | None = None
     message: str
     llm_provider: str = "template"
@@ -52,6 +58,16 @@ class RecommendationResponse(Contract):
         for rec in self.recommendations:
             if rec.commercial.status is not CommercialStatus.ACTIVE:
                 raise ValueError(f"{rec.product.part_number}: only ACTIVE can be recommended")
+            if rec.compatibility.level not in CONFIRMED_LEVELS:
+                raise ValueError(
+                    f"{rec.product.part_number}: recommendations need a confirmed level "
+                    f"(got {rec.compatibility.level}); UNKNOWN goes to unverified_options"
+                )
+        for rec in self.unverified_options:
+            if rec.commercial.status is not CommercialStatus.ACTIVE:
+                raise ValueError(f"{rec.product.part_number}: unverified_options are ACTIVE only")
+            if rec.compatibility.level is not CompatibilityLevel.UNKNOWN:
+                raise ValueError(f"{rec.product.part_number}: unverified_options are UNKNOWN only")
         for rec in self.risky_options:
             if rec.commercial.status is not CommercialStatus.NRND:
                 raise ValueError(f"{rec.product.part_number}: risky_options are NRND only")

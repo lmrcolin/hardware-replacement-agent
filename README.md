@@ -93,7 +93,8 @@ plataforma POR CONFIRMAR).
   ([docs/DATA_INVENTORY.md](docs/DATA_INVENTORY.md)).
 - `ai_parse_document` leyó mal un part number del catálogo; el catálogo se lee con parser determinista (ADR-012).
 - A100 → H100: el datasheet lo llama sucesor, pero los SKU difieren en factor de forma; no se recomienda como directo.
-- Candidatos UNKNOWN se muestran al final con su nivel; ADR-013 propone separarlos (requiere `contract-change`).
+- Candidatos con datos críticos faltantes (UNKNOWN) no se recomiendan: se listan aparte como "posibles, sin datos
+  suficientes" (ADR-013).
 - Clientes Llama/Ollama implementados; su validación real está en `docs/FEATURE_MATRIX.md`.
 
 ## Estructura

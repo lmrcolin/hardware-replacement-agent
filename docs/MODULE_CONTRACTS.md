@@ -14,7 +14,7 @@ Firmas estables (stubs con `NotImplementedError` hasta que se implementen). Camb
 | retrieval | `Retriever.search(query, *, top_k, filters) -> list[ChunkHit]` |
 | commercial | `CommercialEngine.get(part_number) -> CommercialInformation`; `.availability(part_number) -> tuple[status, price, stock]` |
 | compatibility | `derive_requirements(original, query) -> list[TechnicalRequirement]`; `evaluate(original, candidate, reqs) -> CompatibilityResult` |
-| recommendation | `rank(results, products) -> RankedOutput(recommendations, risky_options)` |
+| recommendation | `rank(results, products) -> RankedOutput(recommendations, risky_options, unverified_options)` |
 | llm | `LLMClient.complete_json(prompt, schema) -> BaseModel`; `.generate(prompt) -> str` (DatabricksFMAPI, Ollama, Template) |
 | agent | `AdvisorAgent.answer(query: CustomerQuery) -> RecommendationResponse` |
 | repository | `ArtifactRepository` (LocalParquet, DatabricksSQL): `load_products`, `load_graph`, `load_matrix`, `save_*` |

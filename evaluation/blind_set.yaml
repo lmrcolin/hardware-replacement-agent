@@ -1,0 +1,23 @@
+# Conjunto CIEGO de evaluación (L4). Lo escribe alguien del equipo SIN mirar el sistema ni sus resultados.
+#
+# Cómo llenarlo:
+#   1. Piensa consultas como las haría un cliente real (es/en, con o sin part number, con requisitos).
+#   2. Para cada una, decide la respuesta correcta SOLO con los PDFs de data/raw (catálogo + datasheets)
+#      y escribe en `notes` la fuente (archivo y frase).
+#   3. Usa ids GS-B01..GS-B10 y borra el caso PLACEHOLDER.
+#   4. Ejecuta `make eval-blind`. No cambies el sistema para "pasar" un caso sin justificarlo en el informe.
+#
+# Esquema: igual que gold_set.yaml (ver encabezado de ese archivo).
+version: "0.1.0"
+cases:
+  - id: PLACEHOLDER-B00
+    query: "PLACEHOLDER — reemplazar por consultas ciegas reales"
+    expected_original: null
+    expected_status: null
+    expected_top: null
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: false
+    relevant_documents: []
+    verified_by: null
+    notes: "PLACEHOLDER: el runner lo ignora."

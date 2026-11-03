@@ -45,3 +45,10 @@ def test_evaluation_gates_pass() -> None:
     assert provider == "template" and summary["cases"] == len(results) >= 20
     assert gates_pass(summary), summary
     assert summary["hit_at_1"] is not None and summary["hit_at_1"] >= 0.9
+
+
+def test_blind_set_is_valid_and_ignored_while_placeholder() -> None:
+    blind = load_gold_set(ROOT / "evaluation" / "blind_set.yaml")
+    real = [c for c in blind.cases if not c.is_placeholder]
+    for case in real:  # once filled, the same integrity rules as the gold set apply
+        assert case.notes and case.verified_by, case.id

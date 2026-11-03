@@ -138,7 +138,6 @@ def test_candidate_neighbors(mock_graph: nx.MultiDiGraph) -> None:
     assert "SYN-NIC-200" in parts and "SYN-NIC-100" not in parts
 
 
-@pending("B-13")
 def test_bm25_respects_top_k() -> None:
     assert len(BM25Retriever([]).search("100GbE RDMA", top_k=3)) <= 3
 
@@ -181,13 +180,11 @@ def test_rank_only_recommends_active(products: dict[str, Product]) -> None:
     assert [r.product.part_number for r in out.recommendations] == ["SYN-NIC-200"]
 
 
-@pending("B-18")
 def test_template_llm_parses_query() -> None:
     parsed = TemplateClient().complete_json("Reemplazo para SYN-NIC-100", ParsedQuery)
     assert "SYN-NIC-100" in parsed.part_numbers
 
 
-@pending("B-19")
 def test_agent_recommends_only_active(
     products: dict[str, Product],
     commercial_rows: list[CommercialInformation],

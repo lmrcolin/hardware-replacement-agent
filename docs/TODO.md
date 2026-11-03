@@ -34,8 +34,8 @@ uv run pytest tests/unit/test_stubs.py -k "compat or category or missing or rank
 - [x] B-17 `rank`
 - [x] B-14 `CommercialEngine`
 - [x] B-11 `resolve_part` · B-12 `candidate_neighbors`
-- [ ] B-13 BM25 + FAISS
-- [ ] B-18 LLM clients (Template primero) · B-19 `AdvisorAgent.answer` + VERIFY
+- [x] B-13 BM25 (FAISS pendiente)
+- [x] B-18 LLM clients (Template primero) · B-19 `AdvisorAgent.answer` + VERIFY
 
 ## Frente: producto (skills: streamlit-product, integration-check)
 

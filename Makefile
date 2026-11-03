@@ -1,7 +1,7 @@
 UV ?= uv
 PROFILE ?= emerson
 
-.PHONY: help setup install check lint format imports typecheck test test-contracts pipeline-local eval app excel clean
+.PHONY: help setup install check lint format imports typecheck test test-contracts pipeline-local eval eval-blind app excel clean
 
 help:
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -35,13 +35,16 @@ test: ## All tests
 test-contracts: ## Contract tests only
 	$(UV) run pytest tests/contracts
 
-pipeline-local: ## Build artifacts locally from data/raw (stubs until implemented)
+pipeline-local: ## Build artifacts/ from data/raw (products, chunks, graph, compat matrix)
 	$(UV) run advisor-pipeline
 
 eval: ## Run evaluation over evaluation/gold_set.yaml
 	$(UV) run python -m evaluation.run_eval
 
-app: ## Streamlit UI (uses MockAdvisorAgent until the agent exists)
+eval-blind: ## Run evaluation over the blind set (evaluation/blind_set.yaml)
+	$(UV) run python -m evaluation.run_eval --gold evaluation/blind_set.yaml
+
+app: ## Streamlit chat UI over the real agent (artifacts/ or in-memory build)
 	$(UV) run streamlit run app/streamlit_app.py
 
 excel: ## Build TCO workbook into cost/

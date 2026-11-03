@@ -34,12 +34,12 @@ sintéticos (`SYN-*`) y están marcados como tales.
 | Comando | Qué hace |
 |---|---|
 | `make setup` (alias `make install`) | `.venv` (Python 3.12, uv) + dependencias + hooks pre-commit |
-| `make check` | ruff + mypy + import-linter + pytest (contratos verdes, stubs xfail) |
+| `make check` | ruff + mypy + import-linter + pytest |
 | `make lint` / `make format` | ruff check + format --check + mypy / autoformato |
 | `make test` / `make test-contracts` | pytest completo / solo contratos |
-| `make pipeline-local` | construye `artifacts/` desde `data/raw/` |
-| `make eval` | evaluación sobre `evaluation/gold_set.yaml` |
-| `make app` | Streamlit (MockAdvisorAgent hasta que exista el agente) |
+| `make pipeline-local` | construye `artifacts/` (productos, chunks, grafo, matriz) desde `data/raw/` |
+| `make eval` / `make eval-blind` | evaluación sobre `evaluation/gold_set.yaml` / conjunto ciego |
+| `make app` | chat Streamlit sobre el agente real (artifacts/ o construcción en memoria) |
 | `make excel` | Excel TCO en `cost/` |
 
 ```bash

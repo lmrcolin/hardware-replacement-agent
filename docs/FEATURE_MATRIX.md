@@ -10,8 +10,13 @@ Rellenar al probar cada capacidad en nuestro workspace. Nada se asume disponible
 | AI Search (Vector Search) endpoint + índice Delta Sync | | | | 1 endpoint, 1 unidad, sin Direct Vector Access |
 | Databricks Connect (serverless) desde local | | | | alternativa: SQL warehouse (ADR-009) |
 | Statement Execution API en `Serverless Starter Warehouse` (2X-Small) desde el CLI | lmrcolin | 2026-11-03 | OK | lecturas de verificación; arranque en frío ~segundos |
+| Escritura desde local: Parquet a volumen (Files API) + `CREATE OR REPLACE TABLE ... read_files` vía Statement Execution | Kevinvlz | 2026-11-03 | OK | `DatabricksSQLRepository` (PR #8) en esquema temporal: 32 productos, 126 chunks, matriz y grafo (501/586) idénticos tras ida y vuelta; ~49 s escribir / ~7 s leer en 2X-Small. Requiere `CREATE VOLUME` (no lo tiene `account users`) |
 | Lectura de binarios del repo vía FUSE `/Workspace` en serverless | Kevinvlz | 2026-11-03 | FAIL | 403 (SSE-C); `00_setup` usa la API de Workspace (PR #3) |
 | Permisos UC entre miembros del equipo | equipo | 2026-11-03 | OK tras GRANT | el owner del catálogo es quien ejecutó el bundle; admin de workspace no basta (falta `MANAGE`) |
+| `%pip install` en serverless (egress a PyPI) | Kevinvlz | 2026-11-03 | OK | `90_env_check`: instala pdfplumber, pymupdf, rapidfuzz, networkx, rank-bm25, pyyaml, python-dotenv, httpx. **`pydantic` sin versión NO actualiza** el 1.10.6 preinstalado: pedir `pydantic>=2.9` |
+| Entorno serverless por defecto vs. versión 4 | Kevinvlz | 2026-11-03 | OK con versión 4 | Por defecto: Python 3.11.10 (falla `advisor.llm`, genéricos PEP 695). Con `environments: [{spec: {environment_version: "4"}}]` + `environment_key` en la tarea de notebook: Python 3.12.3 |
+| Importar `advisor` desde la carpeta del repo (`/Workspace`, FUSE) | Kevinvlz | 2026-11-03 | FAIL | `OSError [Errno 5]` intermitente en `src/advisor/extraction/__init__.py` (mismo 403 de FUSE). Solución: wheel `emerson_advisor-*.whl` en el volumen `bronze.libs` + `%pip install --no-deps` |
+| `advisor` completo en serverless (wheel + config desde volumen) | Kevinvlz | 2026-11-03 | OK | `parse_catalog` 32 filas (21/6/2/3) con `H9HCNNNCPMML`; `build_in_memory` sobre `/Volumes/emerson_hw/bronze/raw_files`: 32 productos, 126 chunks, grafo 501/586 (igual que local). YAML de `config/` en `bronze.libs` |
 | Databricks Apps | | | | ≤3, se paran a las 24 h |
 | Genie space sobre tablas gold | | | | opcional para la demo |
 | Descarga de modelos HF desde serverless (egress) | | | | ADR-007 |

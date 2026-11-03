@@ -1,4 +1,4 @@
-"""Streamlit UI: real AdvisorAgent built in memory from data/raw (mock selectable)."""
+"""Streamlit UI: chat over the real AdvisorAgent (artifacts or in-memory build); mock selectable."""
 
 from __future__ import annotations
 
@@ -9,16 +9,12 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from components.render import response_view
 from mock_agent import MockAdvisorAgent
 
 from advisor.agent import Advisor
-from advisor.models import (
-    CompatibilityLevel,
-    CustomerQuery,
-    Recommendation,
-    RecommendationResponse,
-)
-from advisor.pipeline import BuiltArtifacts, build_agent, build_in_memory
+from advisor.models import CustomerQuery
+from advisor.pipeline import BuiltArtifacts, build_agent, load_or_build
 
 REAL, MOCK = "Real (catálogo + datasheets)", "Simulado (fixtures)"
 EXAMPLES = {
@@ -27,20 +23,16 @@ EXAMPLES = {
         "Usábamos la Intel E810 pero ya no la encuentro"
     ),
     "DAQ descontinuada": "Necesito reemplazar la USB-2627",
-    "GPU NRND": "Necesito reemplazar la A100",
-    "Por requisitos": "Busco una GPU de 80GB",
+    "GPU NRND (sucesor no compatible)": "Necesito reemplazar la A100",
+    "Búsqueda por requisitos": "Busco una GPU de 80GB",
+    "Part number con errata": "Reemplazo para la E81O-CQDA2",
     "Consulta vaga": "Busco un microcontrolador barato",
 }
-LEVEL_BADGE = {
-    CompatibilityLevel.COMPATIBLE: ":green[Compatible]",
-    CompatibilityLevel.COMPATIBLE_WITH_CONDITIONS: ":orange[Compatible con condiciones]",
-    CompatibilityLevel.UNKNOWN: ":gray[No confirmada: faltan datos]",
-}
 
 
-@st.cache_resource(show_spinner="Procesando catálogo y datasheets…")
+@st.cache_resource(show_spinner="Cargando catálogo, datasheets y grafo…")
 def get_artifacts() -> BuiltArtifacts:
-    return build_in_memory()
+    return load_or_build()
 
 
 @st.cache_resource
@@ -48,66 +40,41 @@ def get_agent(kind: str) -> Advisor:
     return MockAdvisorAgent() if kind == MOCK else build_agent(artifacts=get_artifacts())
 
 
-def render_recommendation(rec: Recommendation, names: dict[str, str]) -> None:
-    c = rec.commercial
-    level = LEVEL_BADGE.get(rec.compatibility.level, rec.compatibility.level.value)
-    with st.container(border=True):
-        st.subheader(f"{rec.rank}. {rec.product.part_number}")
-        st.caption(f"{c.description} · {c.manufacturer} · {c.status}")
-        cols = st.columns(4)
-        cols[0].markdown(f"**Compatibilidad**  \n{level}")
-        cols[1].metric("Precio USD", f"{c.price_usd:,.2f}" if c.price_usd is not None else "—")
-        cols[2].metric("Stock", c.stock_units if c.stock_units is not None else "—")
-        cols[3].metric("Requisitos obligatorios", f"{rec.compatibility.coverage:.0%}")
-        st.write(rec.rationale)
-        if rec.compatibility.conditions:
-            st.markdown(
-                "**Condiciones**\n" + "\n".join(f"- {x}" for x in rec.compatibility.conditions)
-            )
-        with st.expander("Detalle por requisito"):
-            st.markdown("\n".join(f"- ✓ {x}" for x in rec.covered_requirements) or "—")
-            if rec.uncovered_requirements:
-                st.markdown("\n".join(f"- ✗ {x}" for x in rec.uncovered_requirements))
-        with st.expander(f"Evidencia ({len(rec.evidence)} citas)"):
-            for ev in rec.evidence:
-                source = names.get(ev.document_id, ev.document_id[:12])
-                st.caption(f"{source} · p.{ev.page} — “{ev.quote}”")
-
-
-def render(response: RecommendationResponse, names: dict[str, str]) -> None:
-    if response.is_synthetic:
-        st.warning("Respuesta generada con datos sintéticos de prueba.")
-    if response.clarification_question:
-        st.info(response.clarification_question)
-        return
-    st.markdown(response.message.replace("\n", "  \n"))
-    if response.recommendations:
-        st.header("Sustitutos recomendados" if response.original else "Productos que cumplen")
-        for rec in response.recommendations:
-            render_recommendation(rec, names)
-    if response.risky_options:
-        st.header("Opciones con riesgo (NRND)")
-        for rec in response.risky_options:
-            render_recommendation(rec, names)
-    for warning in response.warnings:
-        st.caption(f"Aviso: {warning}")
-    st.caption(f"Redacción: {response.llm_provider} · contrato {response.contract_version}")
-
-
 st.set_page_config(page_title="Emerson Replacement Advisor", layout="wide")
 st.title("Emerson Replacement Advisor")
 st.caption(
     "Sustitutos para piezas descontinuadas · el catálogo es la fuente de verdad · "
-    "decisiones deterministas"
+    "compatibilidad decidida por reglas deterministas con evidencia"
 )
+
+history = st.session_state.setdefault("history", [])
 
 with st.sidebar:
     kind = st.radio("Agente", [REAL, MOCK])
-    example = st.selectbox("Ejemplos", list(EXAMPLES))
+    st.markdown("**Ejemplos**")
+    for label, text in EXAMPLES.items():
+        if st.button(label, use_container_width=True):
+            st.session_state["pending"] = text
+    if st.button("Limpiar conversación", type="secondary"):
+        history.clear()
+    agent = get_agent(kind)
+    trace = getattr(agent, "last_trace", [])
+    if trace:
+        st.markdown("**Pasos del último análisis**")
+        st.caption(" → ".join(step.value for step in trace))
 
-text = st.text_area(
-    "Describe la pieza a reemplazar o lo que necesitas", value=EXAMPLES[example], height=100
-)
-if st.button("Buscar sustituto", type="primary") and text.strip():
-    names = get_artifacts().document_names if kind == REAL else {}
-    render(get_agent(kind).answer(CustomerQuery(text=text.strip())), names)
+names = get_artifacts().document_names if kind == REAL else {}
+prompt = st.chat_input("Describe la pieza a reemplazar o lo que necesitas")
+prompt = prompt or st.session_state.pop("pending", None)
+if prompt:
+    response = agent.answer(CustomerQuery(text=prompt.strip()))
+    history.append((prompt, response))
+
+if not history:
+    st.info("Escribe una consulta o elige un ejemplo en la barra lateral.")
+for question, response in history:
+    with st.chat_message("user"):
+        st.write(question)
+    with st.chat_message("assistant"):
+        response_view(response, names)
+        st.caption(f"Redacción: {response.llm_provider} · contrato {response.contract_version}")

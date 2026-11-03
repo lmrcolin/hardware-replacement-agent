@@ -218,13 +218,16 @@ def _fmt(value: float | int | bool | None) -> str:
 
 
 def render_markdown(
-    summary: dict[str, float | int | None], results: list[CaseResult], provider: str
+    summary: dict[str, float | int | None],
+    results: list[CaseResult],
+    provider: str,
+    source: str = "gold_set.yaml",
 ) -> str:
     lines = [
         "# Evaluación — Emerson Replacement Advisor",
         "",
         f"Generado por `make eval` el {datetime.now(UTC).date().isoformat()} · LLM: `{provider}` · "
-        f"{summary['cases']} casos de `evaluation/gold_set.yaml` (verificados contra los PDFs).",
+        f"{summary['cases']} casos de `evaluation/{source}` (verificados contra los PDFs).",
         "",
         f"**Puertas de seguridad:** {'OK (todas en 0)' if gates_pass(summary) else 'FALLAN'}",
         "",
@@ -297,13 +300,25 @@ def main() -> int:
     parser.add_argument(
         "--no-report", action="store_true", help="do not rewrite evaluation/report.md"
     )
+    parser.add_argument(
+        "--gold", type=Path, default=GOLD_SET, help="case file (default: evaluation/gold_set.yaml)"
+    )
     args = parser.parse_args()
+    gold = load_gold_set(args.gold)
+    if not [c for c in gold.cases if not c.is_placeholder]:
+        print(f"{args.gold.name}: sin casos reales todavía (solo PLACEHOLDER); nada que evaluar.")
+        return 0
     chain = build_llm_chain(get_settings()) if args.llm == "configured" else None
-    summary, results, provider = run(chain)
-    report = render_markdown(summary, results, provider)
+    summary, results, provider = run(chain, gold)
+    report = render_markdown(summary, results, provider, args.gold.name)
     print(report)
     if not args.no_report:
-        REPORT_MD.write_text(report, encoding="utf-8")
+        report_md = (
+            REPORT_MD
+            if args.gold == GOLD_SET
+            else REPORT_MD.with_name(f"report_{args.gold.stem}.md")
+        )
+        report_md.write_text(report, encoding="utf-8")
         RESULTS_JSON.parent.mkdir(parents=True, exist_ok=True)
         RESULTS_JSON.write_text(
             json.dumps(

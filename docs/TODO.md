@@ -13,13 +13,13 @@ databricks bundle deploy -t dev && databricks bundle run run_all -t dev
 ```
 - [x] B-01 `00_setup`: volumen + 33 PDFs (bundle `run_all`)
 - [ ] B-02 `01_parse`: confirmar 33 filas en `emerson_hw.bronze.documents_parsed`; anotar en FEATURE_MATRIX.md
-- [ ] B-03 `parse_catalog` → 32 filas (21/6/2/3)
-- [ ] B-04 `discover_documents` + `parse_document`
-- [ ] B-05 Completar `config/spec_registry.yaml` con claves reales
-- [ ] B-06 `extract_product` con Evidence
-- [ ] B-07 `join_catalog` + JoinReport
-- [ ] B-08 `chunk_document`
-- [ ] B-09 `build_graph` / `save` / `load`
+- [x] B-03 `parse_catalog` → 32 filas (21/6/2/3)
+- [x] B-04 `discover_documents` + `parse_document`
+- [x] B-05 Completar `config/spec_registry.yaml` con claves reales
+- [x] B-06 `extract_product` con Evidence
+- [x] B-07 `join_catalog` + JoinReport
+- [x] B-08 `chunk_document`
+- [x] B-09 `build_graph` / `save` / `load`
 - [ ] B-10 Notebooks 03–07 + `make pipeline-local`
 
 ## Frente: inteligencia (skills: compatibility-matching, agentic-rag, knowledge-graph)
@@ -33,7 +33,7 @@ uv run pytest tests/unit/test_stubs.py -k "compat or category or missing or rank
 - [ ] B-16 `derive_requirements`
 - [ ] B-17 `rank`
 - [ ] B-14 `CommercialEngine`
-- [ ] B-11 `resolve_part` · B-12 `candidate_neighbors`
+- [x] B-11 `resolve_part` · B-12 `candidate_neighbors`
 - [ ] B-13 BM25 + FAISS
 - [ ] B-18 LLM clients (Template primero) · B-19 `AdvisorAgent.answer` + VERIFY
 

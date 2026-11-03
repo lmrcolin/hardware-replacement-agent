@@ -121,7 +121,6 @@ def test_chunk_ids_are_stable() -> None:
     ]
 
 
-@pending("B-09")
 def test_graph_roundtrip(products: dict[str, Product], tmp_path: Path) -> None:
     g = kg.build_graph(list(products.values()), [])
     kg.save(g, tmp_path / "graph.json")
@@ -130,12 +129,10 @@ def test_graph_roundtrip(products: dict[str, Product], tmp_path: Path) -> None:
 
 
 # ---------- Inteligencia ----------
-@pending("B-11")
 def test_resolve_part_fuzzy(mock_graph: nx.MultiDiGraph) -> None:
     assert kg.resolve_part(mock_graph, "syn nic 100")[0].part_number == "SYN-NIC-100"
 
 
-@pending("B-12")
 def test_candidate_neighbors(mock_graph: nx.MultiDiGraph) -> None:
     parts = {c.part_number for c in kg.candidate_neighbors(mock_graph, "SYN-NIC-100")}
     assert "SYN-NIC-200" in parts and "SYN-NIC-100" not in parts

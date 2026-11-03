@@ -10,6 +10,7 @@ Rellenar al probar cada capacidad en nuestro workspace. Nada se asume disponible
 | AI Search (Vector Search) endpoint + índice Delta Sync | | | | 1 endpoint, 1 unidad, sin Direct Vector Access |
 | Databricks Connect (serverless) desde local | | | | alternativa: SQL warehouse (ADR-009) |
 | Statement Execution API en `Serverless Starter Warehouse` (2X-Small) desde el CLI | lmrcolin | 2026-11-03 | OK | lecturas de verificación; arranque en frío ~segundos |
+| Escritura desde local: Parquet a volumen (Files API) + `CREATE OR REPLACE TABLE ... read_files` vía Statement Execution | Kevinvlz | 2026-11-03 | OK | `DatabricksSQLRepository` (PR #8) en esquema temporal: 32 productos, 126 chunks, matriz y grafo (501/586) idénticos tras ida y vuelta; ~49 s escribir / ~7 s leer en 2X-Small. Requiere `CREATE VOLUME` (no lo tiene `account users`) |
 | Lectura de binarios del repo vía FUSE `/Workspace` en serverless | Kevinvlz | 2026-11-03 | FAIL | 403 (SSE-C); `00_setup` usa la API de Workspace (PR #3) |
 | Permisos UC entre miembros del equipo | equipo | 2026-11-03 | OK tras GRANT | el owner del catálogo es quien ejecutó el bundle; admin de workspace no basta (falta `MANAGE`) |
 | Databricks Apps | | | | ≤3, se paran a las 24 h |

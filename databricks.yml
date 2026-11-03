@@ -30,8 +30,8 @@ resources:
       name: run_all
       description: >-
         Pipeline completo en serverless: 00 setup (catálogo, volúmenes, PDFs, wheel) -> 01 parsing
-        bronze -> 02 silver/gold.products -> 03 chunks -> 04 grafo -> 05 matriz -> 06 artefactos;
-        07 re-sincroniza AI Search (opcional) tras 03.
+        bronze -> 02 silver/gold.products -> 03 chunks -> 04 grafo -> 05 matriz -> 06 artefactos ->
+        07 AI Search (crea o re-sincroniza endpoint e índice).
       max_concurrent_runs: 1
       # Los parámetros del job llegan a los widgets de los notebooks con el mismo nombre.
       parameters:
@@ -39,6 +39,8 @@ resources:
           default: ${var.catalog}
         - name: force
           default: "false"
+        - name: ai_search
+          default: "true"
       # Serverless (único cómputo en Free Edition). 02-06 necesitan Python 3.12 (advisor usa
       # genéricos PEP 695): entorno serverless versión 4. 00/01 usan el entorno por defecto.
       environments:
@@ -84,13 +86,14 @@ resources:
           environment_key: py312
           notebook_task:
             notebook_path: ./databricks/notebooks/06_export_artifacts.py
-        # Opcional: re-sincroniza el índice de AI Search (TRIGGERED) tras reescribir los chunks.
-        # Si el índice no existe, el notebook termina en SKIP sin fallar.
-        - task_key: sync_ai_search
+        # Última tarea: crea (si falta) el endpoint emerson-vs y el índice Delta Sync de
+        # gold.document_chunks, o lo re-sincroniza. Idempotente; ai_search=false la omite.
+        - task_key: ai_search
           depends_on:
-            - task_key: chunk_index
+            - task_key: export_artifacts
+          environment_key: py312
           notebook_task:
-            notebook_path: ./databricks/notebooks/07_sync_ai_search.py
+            notebook_path: ./databricks/notebooks/07_ai_search.py
 
 targets:
   dev:

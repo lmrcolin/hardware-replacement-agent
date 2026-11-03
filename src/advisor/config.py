@@ -51,6 +51,8 @@ class RetrievalSettings(BaseModel):
     backend: RetrieverBackend = "bm25"
     top_k: int = Field(default=8, ge=1, le=100)
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    ai_search_endpoint: str = "emerson-vs"
+    ai_search_index: str = "emerson_hw.gold.document_chunks_index"
 
 
 class Settings(BaseModel):

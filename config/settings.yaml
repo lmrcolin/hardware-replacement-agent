@@ -25,5 +25,8 @@ retrieval:
   backend: bm25                 # bm25 | faiss | hybrid | ai_search
   top_k: 8
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
+  # AI Search (Vector Search): Delta Sync index over gold.document_chunks, embeddings databricks-gte-large-en.
+  ai_search_endpoint: emerson-vs
+  ai_search_index: emerson_hw.gold.document_chunks_index
 
 repository_backend: local       # local | databricks_sql

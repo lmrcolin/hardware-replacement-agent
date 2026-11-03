@@ -40,7 +40,8 @@ De arriba abajo (solo se importa hacia abajo; verificado por import-linter y `te
 11. `models` | `config`
 
 `compatibility` y `recommendation` no pueden importar `llm`, `retrieval`, `httpx` ni `databricks` (determinismo).
-`app/` solo importa `advisor.models`, `advisor.agent`, `advisor.repository`, `advisor.config`.
+`app/` solo importa `advisor.models`, `advisor.agent`, `advisor.repository`, `advisor.config` y `advisor.pipeline`
+(raíz de composición: `build_in_memory()` / `build_agent()`).
 
 ## Ejecución
 - **Databricks (Free Edition):** bundle `databricks.yml` (job `run_all`) y notebooks `databricks/notebooks/00–06` construyen Delta + artefactos; consultas acotadas e idempotentes.

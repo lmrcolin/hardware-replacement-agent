@@ -9,7 +9,7 @@ description: Builds the Streamlit customer-facing UI, reusable components and th
 `app/streamlit_app.py`, `app/components/`, `app/mock_agent.py`.
 
 ## Convenciones
-- La app solo importa `advisor.models`, `advisor.agent`, `advisor.repository`, `advisor.config`.
+- La app solo importa `advisor.models`, `advisor.agent`, `advisor.repository`, `advisor.config` y `advisor.pipeline` (para `build_agent`).
 - Toda vista consume `RecommendationResponse`; sin lógica de negocio en la UI.
 - `MockAdvisorAgent` (fixtures) hasta que exista `AdvisorAgent`; selector en la barra lateral.
 - Mostrar por recomendación: part number, fabricante, nivel (badge), precio y stock del catálogo, requisitos cubiertos/no cubiertos, condiciones, evidencia (documento/página).

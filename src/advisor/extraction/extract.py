@@ -96,17 +96,23 @@ def _is_heading(line: str) -> bool:
 
 
 def segments(doc: ParsedDocument) -> list[Segment]:
-    """Split each page at section headings and metadata lines ('Manufacturer: ...')."""
+    """Split each page at section headings; preamble metadata lines ('Manufacturer: ...') are
+    their own segments, but inside a section (e.g. 'Part Number:' in Ordering Information) they
+    stay with the section."""
     out: list[Segment] = []
     for page in doc.pages:
         heading: str = ""
         buf: list[str] = []
-        for raw in page.text.splitlines():
+        in_preamble = True
+        for i, raw in enumerate(page.text.splitlines()):
             line = raw.strip()
             if not line:
                 continue
-            is_meta = line.startswith(tuple(f"{m}:" for m in META_LABELS))
-            if _is_heading(line) or is_meta:
+            is_heading = _is_heading(line)
+            if is_heading and i > 0 and doc.title and line != doc.title:
+                in_preamble = False
+            is_meta = in_preamble and line.startswith(tuple(f"{m}:" for m in META_LABELS))
+            if is_heading or is_meta:
                 if buf:
                     out.append(Segment(page.page_number, heading, normalize(" ".join(buf))))
                 heading, buf = (line, []) if not is_meta else ("", [line])

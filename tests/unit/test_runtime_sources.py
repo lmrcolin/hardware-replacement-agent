@@ -93,3 +93,12 @@ def test_warehouse_autodetect_requires_a_single_one() -> None:
     )
     with pytest.raises(ValueError, match="ADVISOR_DATABRICKS_WAREHOUSE_ID"):
         pipeline._warehouse_id(settings, two)  # type: ignore[arg-type]
+
+
+def test_source_label_never_shows_personal_paths(tmp_path: Path) -> None:
+    local = pipeline._source_label(pipeline.REPO_ROOT / "artifacts" / "no-such-dir")
+    assert local == "artefactos en artifacts/no-such-dir/ (sin manifiesto de origen)"
+    outside = pipeline._source_label(tmp_path)
+    assert str(tmp_path.parent) not in outside and outside.startswith(
+        f"artefactos en {tmp_path.name}/"
+    )

@@ -236,3 +236,17 @@ def test_commercial_engine_hides_price_of_non_active() -> None:
     assert engine.availability("SYN-N").price_usd is None
     with pytest.raises(KeyError):
         engine.get("NOPE")
+
+
+@pytest.mark.parametrize(
+    ("required", "candidate", "outcome"),
+    [
+        ("USB", "USB 3.0", RuleOutcome.PASS),
+        ("PCIe", "PCIe 5.0 x16", RuleOutcome.PASS),
+        ("USB", "SPI/PAR", RuleOutcome.FAIL),
+    ],
+)
+def test_family_only_interface_requirement(
+    required: str, candidate: str, outcome: RuleOutcome
+) -> None:
+    assert _interface(required, candidate)[0] is outcome

@@ -99,7 +99,6 @@ def test_parse_document_reads_datasheet() -> None:
     assert doc.pages and "E810" in doc.pages[0].text
 
 
-@pending("B-06")
 def test_extract_product_attaches_evidence() -> None:
     registry = extraction.load_spec_registry(ROOT / "config" / "spec_registry.yaml")
     product = extraction.extract_product(SYNTH_DOC, registry)
@@ -107,7 +106,6 @@ def test_extract_product_attaches_evidence() -> None:
     assert all(s.evidence for s in product.specifications if s.value is not None)
 
 
-@pending("B-07")
 def test_join_catalog_matches_all(
     products: dict[str, Product], commercial_rows: list[CommercialInformation]
 ) -> None:
@@ -116,7 +114,6 @@ def test_join_catalog_matches_all(
     assert all(p.commercial is not None for p in joined)
 
 
-@pending("B-08")
 def test_chunk_ids_are_stable() -> None:
     first = chunking.chunk_document(SYNTH_DOC)
     assert first and [c.chunk_id for c in first] == [

@@ -52,3 +52,23 @@ assert len(in_volume) == EXPECTED_PDFS, (
     f"Se esperaban {EXPECTED_PDFS} PDFs en {VOLUME_DIR} y hay {len(in_volume)}."
 )
 assert any(f.startswith("Catalogo_Comercial") for f in in_volume), "Falta el catálogo comercial"
+
+# COMMAND ----------
+
+# Librería y configuración para los notebooks 02-06 (K2): el bundle construye `dist/*.whl` en cada
+# deploy (artifacts de databricks.yml) y lo sincroniza; aquí se copia al volumen `bronze.libs`,
+# desde donde se instala con %pip (importar `advisor` desde /Workspace por FUSE falla).
+# Se sobrescribe siempre: el wheel conserva el nombre aunque cambie el código.
+LIBS_DIR = f"/Volumes/{CATALOG}/bronze/libs"
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.bronze.libs")
+wheels = [f for f in os.listdir(os.path.join(repo_root, "dist")) if f.endswith(".whl")]
+libs = [os.path.join("dist", f) for f in wheels]
+configs = ("spec_registry.yaml", "compat_rules.yaml", "settings.yaml")
+libs += [os.path.join("config", f) for f in configs]
+for rel in libs:
+    with ws.workspace.download(os.path.join(repo_root, rel), format=ExportFormat.AUTO) as src:
+        data = src.read()
+    with open(os.path.join(LIBS_DIR, os.path.basename(rel)), "wb") as out:
+        out.write(data)
+print("libs:", sorted(os.listdir(LIBS_DIR)))
+assert any(f.endswith(".whl") for f in os.listdir(LIBS_DIR)), "Falta el wheel en bronze.libs"

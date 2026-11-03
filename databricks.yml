@@ -1,7 +1,7 @@
 # Databricks Asset Bundle del proyecto.
 # El host NO va aquí: se toma del perfil de `databricks auth login` (o de DATABRICKS_CONFIG_PROFILE).
 #   databricks bundle validate
-#   databricks bundle deploy -t dev
+#   databricks bundle deploy -t dev      # construye dist/*.whl con uv y sincroniza el repo
 #   databricks bundle run run_all -t dev
 bundle:
   name: hardware-replacement-agent
@@ -11,11 +11,26 @@ variables:
     description: Catálogo de Unity Catalog donde viven bronze/silver/gold.
     default: emerson_hw
 
+# El paquete `advisor` se instala en serverless como wheel (importarlo desde /Workspace por FUSE
+# falla, ver FEATURE_MATRIX). Se construye en cada deploy y se sincroniza aunque dist/ esté en
+# .gitignore; 00_setup lo copia al volumen bronze.libs.
+artifacts:
+  advisor:
+    type: whl
+    build: uv build --wheel
+    path: .
+
+sync:
+  include:
+    - dist/*.whl
+
 resources:
   jobs:
     run_all:
       name: run_all
-      description: Pipeline completo. 00 setup (catálogo, esquemas, volumen, copia de PDFs) -> 01 parsing bronze.
+      description: >-
+        Pipeline completo en serverless: 00 setup (catálogo, volúmenes, PDFs, wheel) -> 01 parsing
+        bronze -> 02 silver/gold.products -> 03 chunks -> 04 grafo -> 05 matriz -> 06 artefactos.
       max_concurrent_runs: 1
       # Los parámetros del job llegan a los widgets de los notebooks con el mismo nombre.
       parameters:
@@ -23,7 +38,12 @@ resources:
           default: ${var.catalog}
         - name: force
           default: "false"
-      # Sin cluster ni environment: las tareas de notebook corren en serverless (único cómputo en Free Edition).
+      # Serverless (único cómputo en Free Edition). 02-06 necesitan Python 3.12 (advisor usa
+      # genéricos PEP 695): entorno serverless versión 4. 00/01 usan el entorno por defecto.
+      environments:
+        - environment_key: py312
+          spec:
+            environment_version: "4"
       tasks:
         - task_key: setup
           notebook_task:
@@ -33,6 +53,36 @@ resources:
             - task_key: setup
           notebook_task:
             notebook_path: ./databricks/notebooks/01_parse.py
+        - task_key: extract_enrich
+          depends_on:
+            - task_key: parse
+          environment_key: py312
+          notebook_task:
+            notebook_path: ./databricks/notebooks/02_extract_enrich.py
+        - task_key: chunk_index
+          depends_on:
+            - task_key: extract_enrich
+          environment_key: py312
+          notebook_task:
+            notebook_path: ./databricks/notebooks/03_chunk_index.py
+        - task_key: build_kg
+          depends_on:
+            - task_key: chunk_index
+          environment_key: py312
+          notebook_task:
+            notebook_path: ./databricks/notebooks/04_build_kg.py
+        - task_key: compat_matrix
+          depends_on:
+            - task_key: build_kg
+          environment_key: py312
+          notebook_task:
+            notebook_path: ./databricks/notebooks/05_compat_matrix.py
+        - task_key: export_artifacts
+          depends_on:
+            - task_key: compat_matrix
+          environment_key: py312
+          notebook_task:
+            notebook_path: ./databricks/notebooks/06_export_artifacts.py
 
 targets:
   dev:

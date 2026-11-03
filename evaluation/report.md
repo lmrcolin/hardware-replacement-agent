@@ -1,22 +1,24 @@
 # Evaluación — Emerson Replacement Advisor
 
-Generado por `make eval` el 2026-11-03 · LLM: `template` · 22 casos de `evaluation/gold_set.yaml` (verificados contra los PDFs).
+Generado por `make eval` el 2026-11-03 · LLM: `template` · retriever: `bm25` · 32 casos de `evaluation/gold_set.yaml` (verificados contra los PDFs).
 
 **Puertas de seguridad:** OK (todas en 0)
 
 | Métrica | Valor |
 |---|---|
-| cases | 22 |
+| cases | 32 |
 | resolution_accuracy | 1.00 |
 | status_accuracy | 1.00 |
 | clarification_accuracy | 1.00 |
 | hit_at_1 | 1.00 |
 | mrr_recommendation | 1.00 |
 | level_accuracy | 1.00 |
-| retrieval_precision_at_3 | 0.44 |
-| retrieval_precision_at_5 | 0.28 |
-| retrieval_recall_at_5 | 1.00 |
-| retrieval_mrr | 1.00 |
+| retrieval_precision_at_3 | 0.35 |
+| retrieval_precision_at_5 | 0.22 |
+| retrieval_recall_at_5 | 0.88 |
+| retrieval_mrr | 0.83 |
+| retrieval_mrr_semantic_cases | 0.56 |
+| retrieval_recall_at_5_semantic_cases | 0.70 |
 | gate_forbidden_recommendations | 0 |
 | gate_non_active_recommendations | 0 |
 | gate_price_stock_mismatches | 0 |
@@ -48,6 +50,16 @@ Generado por `make eval` el 2026-11-03 · LLM: `template` · 22 casos de `evalua
 | GS-20 | — | — | — | ✓ | — | — | — | — | — | — |
 | GS-21 | — | — | — | ✓ | — | — | — | — | — | — |
 | GS-22 | — | — | — | ✓ | — | — | — | — | — | — |
+| GS-R01 | — | — | — | — | — | — | — | 0.33 | 1.00 | 1.00 |
+| GS-R02 | — | — | — | — | — | — | — | 0.33 | 1.00 | 1.00 |
+| GS-R03 | — | — | — | — | — | — | — | 0.00 | 0.00 | 0.00 |
+| GS-R04 | — | — | — | — | — | — | — | 0.33 | 1.00 | 1.00 |
+| GS-R05 | — | — | — | — | — | — | — | 0.33 | 1.00 | 1.00 |
+| GS-R06 | — | — | — | — | — | — | — | 0.33 | 1.00 | 0.33 |
+| GS-R07 | — | — | — | — | — | — | — | 0.00 | 0.00 | 0.00 |
+| GS-R08 | — | — | — | — | — | — | — | 0.33 | 1.00 | 1.00 |
+| GS-R09 | — | — | — | — | — | — | — | 0.00 | 1.00 | 0.25 |
+| GS-R10 | — | — | — | — | — | — | — | 0.00 | 0.00 | 0.06 |
 
 ## Cómo leer estas cifras
 

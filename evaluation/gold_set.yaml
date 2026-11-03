@@ -14,6 +14,7 @@
 #   expect_clarification
 #   clarification_mentions  part numbers the clarification question must suggest
 #   relevant_documents  datasheets a retriever should surface for this query (retrieval metrics); [] = skip
+#   retrieval_only      true = only the document ranking is scored (agent metrics skipped)
 #   verified_by         who checked the expectation against the PDFs
 #   notes               justification with the source
 version: "1.0.0"
@@ -270,3 +271,126 @@ cases:
     relevant_documents: []
     verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
     notes: "Consulta sin información."
+
+  # ---------------------------------------------------------------- retrieval only (semantic, no part numbers)
+  # Descriptive Spanish queries over English datasheets; only the document ranking is scored.
+  - id: GS-R01
+    query: "sensor para medir humedad y gases volátiles en interiores"
+    retrieval_only: true
+    expected_original: null
+    expected_status: null
+    expected_top: null
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: false
+    relevant_documents: [bme680-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Solo recuperación. BME680: 'gas, pressure, humidity, and temperature sensors'; 'Gas sensor: MOx-based, detects VOCs'."
+  - id: GS-R02
+    query: "procesador de servidor con 96 núcleos y memoria DDR5"
+    retrieval_only: true
+    expected_original: null
+    expected_status: null
+    expected_top: null
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: false
+    relevant_documents: [amd-epyc-9004-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Solo recuperación. EPYC 9654: '96-core, 192-thread server processor'; '12-channel DDR5-4800 memory'."
+  - id: GS-R03
+    query: "memoria apilada de gran ancho de banda para aceleradores de IA"
+    retrieval_only: true
+    expected_original: null
+    expected_status: null
+    expected_top: null
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: false
+    relevant_documents: [samsung-hbm3-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Solo recuperación. H3A8G32AMR: 'HBM3 (High Bandwidth Memory gen 3) stack… Designed for AI accelerators'."
+  - id: GS-R04
+    query: "controlador de USB tipo C que negocia potencia de hasta 100 W"
+    retrieval_only: true
+    expected_original: null
+    expected_status: null
+    expected_top: null
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: false
+    relevant_documents: [tps65982-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Solo recuperación. TPS65982AB: 'USB Type-C and Power Delivery controller… up to 20V and 5A (100W)'."
+  - id: GS-R05
+    query: "FPGA de muy bajo consumo para dispositivos portátiles"
+    retrieval_only: true
+    expected_original: null
+    expected_status: null
+    expected_top: null
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: false
+    relevant_documents: [lattice-ice40-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Solo recuperación. ICE40UP5K: 'ultra-low-power FPGA for mobile, wearable and IoT edge applications'."
+  - id: GS-R06
+    query: "unidad de estado sólido empresarial de 2.5 pulgadas con doble puerto"
+    retrieval_only: true
+    expected_original: null
+    expected_status: null
+    expected_top: null
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: false
+    relevant_documents: [wd-ultrastar-dc-sn860.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Solo recuperación. SN860: 'enterprise NVMe SSD… U.2 2.5-inch 15 mm form factor, PCIe Gen4 x4 dual-port'."
+  - id: GS-R07
+    query: "giroscopio y acelerómetro de seis ejes para seguimiento de movimiento"
+    retrieval_only: true
+    expected_original: null
+    expected_status: null
+    expected_top: null
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: false
+    relevant_documents: [mpu6050-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Solo recuperación. MPU-6050: 'integrated 6-axis MotionTracking device combining a 3-axis gyroscope, 3-axis accelerometer'."
+  - id: GS-R08
+    query: "microcontrolador con Wi-Fi y Bluetooth integrados"
+    retrieval_only: true
+    expected_original: null
+    expected_status: null
+    expected_top: null
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: false
+    relevant_documents: [esp32-s3-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Solo recuperación. ESP32-S3: 'dual-core XTensa LX7 microcontroller with integrated Wi-Fi (802.11 b/g/n) and Bluetooth 5 (LE)'."
+  - id: GS-R09
+    query: "etapa de potencia integrada para reguladores de voltaje de CPU y GPU"
+    retrieval_only: true
+    expected_original: null
+    expected_status: null
+    expected_top: null
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: false
+    relevant_documents: [ir3555-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Solo recuperación. IR3555MTRPBF: 'integrated power stage… Designed for multiphase CPU, GPU and ASIC voltage regulators'."
+  - id: GS-R10
+    query: "tarjeta gráfica para renderizado y creación de contenido en estaciones de trabajo"
+    retrieval_only: true
+    expected_original: null
+    expected_status: null
+    expected_top: null
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: false
+    relevant_documents: [nvidia-rtx4090-datasheet.pdf]
+    verified_by: "lmrcolin + asistente (revisión de PDFs; pendiente validación de experto)"
+    notes: "Solo recuperación. RTX 4090: 'Suited for workstation AI development, rendering and content creation'."

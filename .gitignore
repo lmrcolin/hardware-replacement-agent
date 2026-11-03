@@ -19,8 +19,7 @@ htmlcov/
 !.env.example
 .databrickscfg
 
-# Data: only synthetic, versioned fixtures are tracked
-data/raw/*
+# Data: raw source documents are tracked; derived outputs are not
 data/processed/*
 !data/**/.gitkeep
 

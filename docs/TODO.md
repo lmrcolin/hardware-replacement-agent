@@ -35,12 +35,12 @@ BM25, repositorio local, golden set de 22 casos.
 - Serverless: leer binarios del repo por FUSE `/Workspace` da 403 ⇒ usar la API de Workspace (como `00_setup`).
 - Perfil CLI del equipo: `lmrcolin` tiene GRANT sobre `emerson_hw`. Warehouse: `Serverless Starter Warehouse` (2X-Small).
 
-### K1. Cerrar B-02 (5 min) — rama `docs/b02-bronze`
+### K1. ✅ Cerrar B-02 (5 min) — rama `docs/b02-bronze`
 1. En `docs/TODO.md` marca B-02 como hecho (ya verificado arriba).
 2. En `docs/FEATURE_MATRIX.md` confirma la fila de `ai_parse_document` (ya tiene datos; solo revisar).
 - Aceptación: `make check` verde.
 
-### K2. Probar dependencias en serverless (30 min) — rama `feat/databricks-env`
+### K2. ✅ Probar dependencias en serverless (30 min) — rama `feat/databricks-env`
 1. En un notebook nuevo `databricks/notebooks/90_env_check.py` (no entra al job):
    `%pip install pdfplumber pymupdf rapidfuzz networkx rank-bm25 pydantic pyyaml` y luego `dbutils.library.restartPython()`.
 2. Importa `advisor` desde el Git folder: `sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "..", "..", "src")))`
@@ -52,7 +52,7 @@ BM25, repositorio local, golden set de 22 casos.
   `databricks-sdk` (Statement Execution) o desde parquet en un volumen; documenta la decisión en ADR-012.
 - Aceptación: fila en FEATURE_MATRIX con resultado real.
 
-### K3. Notebook 02_extract_enrich (B-10) — rama `feat/databricks-silver`
+### K3. ✅ Notebook 02_extract_enrich (B-10) — rama `feat/databricks-silver`
 1. Widget `catalog` (default `emerson_hw`). Igual de fino que 00/01: la lógica viene de `src/advisor`.
 2. Pasos en el notebook:
    - `discover_documents(Path("/Volumes/<catalog>/bronze/raw_files"))` → `parse_catalog` (catálogo) y `parse_document`
@@ -68,7 +68,7 @@ BM25, repositorio local, golden set de 22 casos.
 4. Actualiza la sección "Tablas Delta" de `docs/DATA_MODEL.md` con los esquemas reales.
 - Aceptación: correr dos veces seguidas no duplica filas; asserts verdes.
 
-### K4. Notebooks 03_chunk_index y 04_build_kg (B-10) — misma rama o `feat/databricks-gold`
+### K4. ✅ Notebooks 03_chunk_index y 04_build_kg (B-10) — misma rama o `feat/databricks-gold`
 1. 03: `chunk_document` por datasheet → `gold.document_chunks` (chunk_id, document_id, page_start, page_end, section,
    text, part_numbers). `ALTER TABLE ... SET TBLPROPERTIES (delta.enableChangeDataFeed = true)`.
    Assert: 126 chunks (valor local actual); chunk_ids únicos.
@@ -78,7 +78,7 @@ BM25, repositorio local, golden set de 22 casos.
    (E810→MCX75310AAS-NEAT, E810→BCM57508, USB-2627→USB-2633, A100-SXM4-80GB→H100-SXM5).
 - Aceptación: asserts verdes y conteos iguales a los locales (`tests/data/test_knowledge_graph.py`).
 
-### K5. Notebook 05_compat_matrix (B-10)
+### K5. ✅ Notebook 05_compat_matrix (B-10)
 1. Para cada producto no ACTIVE: `derive_requirements(original, ParsedQuery(original_text=pn))` y `evaluate` contra
    cada producto de su categoría → `gold.compat_matrix` (original, candidate, level, coverage, score, conditions JSON,
    missing JSON, rule_results JSON).
@@ -86,7 +86,7 @@ BM25, repositorio local, golden set de 22 casos.
    MPU-6050, WUS4C6464DSP3X5, IR3555MTRPBF y A100-SXM4-80GB sin candidato confirmado.
 - Aceptación: asserts verdes.
 
-### K6. Notebook 06_export_artifacts (B-10)
+### K6. ✅ Notebook 06_export_artifacts (B-10)
 1. `CREATE VOLUME IF NOT EXISTS <catalog>.gold.artifacts`.
 2. Lo más simple: `advisor.pipeline.export_artifacts(artifacts_dir=Path("/Volumes/<catalog>/gold/artifacts"))`
    (ya implementado en L1: escribe `products.parquet`, `chunks.parquet`, `compat_matrix.parquet`, `graph.json` y
@@ -95,14 +95,14 @@ BM25, repositorio local, golden set de 22 casos.
 3. Documenta en el notebook cómo bajarlos: `databricks fs cp -r dbfs:/Volumes/emerson_hw/gold/artifacts ./artifacts --profile lmrcolin`.
 - Aceptación: en local, `LocalParquetRepository(Path("artifacts")).load_products()` devuelve 32 productos tras copiar.
 
-### K7. Job `run_all` completo
+### K7. ✅ Job `run_all` completo
 1. En `databricks.yml` añade tareas `extract_enrich`, `chunk_index`, `build_kg`, `compat_matrix`, `export_artifacts`
    (02→06) con `depends_on` en cadena tras `parse`; mismos parámetros `catalog`/`force`.
 2. `databricks bundle validate` y `databricks bundle deploy -t dev` + `databricks bundle run run_all -t dev`.
 3. Si `%pip` es necesario, declara las dependencias como `environment` del job serverless (o `%pip` en cada notebook).
 - Aceptación: job verde de punta a punta; captura del run para la demo.
 
-### K8. DatabricksSQLRepository (segunda mitad de B-20) — rama `feat/repository-databricks`
+### K8. ✅ DatabricksSQLRepository (segunda mitad de B-20) — rama `feat/repository-databricks`
 1. Implementa en `src/advisor/repository/databricks_sql.py` (mueve la clase desde `base.py` si hace falta, sin cambiar
    la firma pública) usando `WorkspaceClient(profile=...).statement_execution.execute_statement` sobre `gold.*`.
 2. `load_products`, `load_chunks`, `load_compat_matrix` leen tablas gold y validan con los modelos; `load_graph` desde
@@ -110,13 +110,13 @@ BM25, repositorio local, golden set de 22 casos.
 3. Tests unitarios con un `WorkspaceClient` falso (sin red), en `tests/unit/test_repository_databricks.py`.
 - Aceptación: `make check` verde (import-linter incluido).
 
-### K9. Llama por FMAPI (FEATURE_MATRIX)
+### K9. ✅ Llama por FMAPI (FEATURE_MATRIX)
 1. `ADVISOR_DATABRICKS_PROFILE=lmrcolin ADVISOR_LLM_PROVIDERS=databricks,template uv run python -m evaluation.run_eval --llm configured --no-report`.
 2. Anota en `FEATURE_MATRIX.md`: OK/FAIL, latencia aproximada, si las puertas `gate_*` siguen en 0 y si VERIFY tuvo que
    volver al borrador (warnings "no verificados").
 - Aceptación: fila con resultado real. Si hay rate limit, anotarlo; el sistema debe caer a `template` sin error.
 
-### K10. Reproducibilidad (parte Databricks de B-24) — archivo compartido, avisar antes
+### K10. ✅ Reproducibilidad (parte Databricks de B-24) — archivo compartido, avisar antes
 1. En `scripts/reproduce_from_scratch.sh` completa la sección del bundle: validate → deploy → run → verificar conteos
    (`SELECT count(*)` de `bronze.documents_parsed`=33, `gold.products`=32) con `databricks api post /api/2.0/sql/statements`.
 2. Paso final opcional: copiar artefactos del volumen a `./artifacts`.

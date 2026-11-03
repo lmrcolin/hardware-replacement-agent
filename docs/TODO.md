@@ -187,7 +187,8 @@ BM25, repositorio local, golden set de 22 casos.
 3. `scripts/smoke_tests.md`: actualizar comandos y valores esperados reales.
 - Aceptación: alguien que no conoce el repo sigue el README y llega a la demo.
 
-### L6. Reproducibilidad local (parte local de B-24) — archivo compartido, avisar antes
+### L6. ✅ Reproducibilidad local (parte local de B-24) — archivo compartido, avisar antes
+> El script quedó dividido en secciones `LOCAL (L6)` y `DATABRICKS (K10 — Kevin)`; Kevin solo edita la suya.
 1. En `scripts/reproduce_from_scratch.sh` sección local: `make setup` → `make check` → `make pipeline-local` → `make eval`
    → `make excel`; flag `--local-only` ya existe.
 - Aceptación: `scripts/reproduce_from_scratch.sh --local-only` termina en verde.

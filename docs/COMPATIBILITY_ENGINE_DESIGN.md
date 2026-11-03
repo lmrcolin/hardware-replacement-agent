@@ -46,7 +46,7 @@ Sin LLM, sin retrieval, sin red. Similitud semántica nunca concede compatibilid
 | MPU-6050 | DISCONTINUED | ninguna | BME680 no mide giroscopio/acelerómetro |
 | WUS4C6464DSP3X5 | DISCONTINUED | ninguna | 990 PRO: 2 TB < 6.4 TB, M.2 ≠ U.2 |
 | IR3555MTRPBF | EOL | ninguna | TPS65982 es controlador USB-PD (otra función) |
-| Cortex-A78 | NRND | w9-3595X solo como UNKNOWN | EPYC: Zen 4 ≠ ARMv8.2A; el Xeon no declara arquitectura |
+| Cortex-A78 | NRND | ninguna (w9-3595X en `unverified_options`) | EPYC: Zen 4 ≠ ARMv8.2A; el Xeon no declara arquitectura |
 
-**Decisión abierta (equipo):** los candidatos UNKNOWN hoy aparecen al final de `recommendations` con su nivel explícito.
-Alternativa: moverlos a una lista propia (`unverified_options`), lo que requiere un PR `contract-change`.
+**ADR-013 (contrato 1.1.0):** los candidatos ACTIVE con nivel UNKNOWN van a `unverified_options`, nunca a
+`recommendations`; la UI los muestra como "Posibles, sin datos suficientes — requieren validación de un experto".

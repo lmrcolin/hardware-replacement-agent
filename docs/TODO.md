@@ -142,7 +142,7 @@ BM25, repositorio local, golden set de 22 casos.
    guarda se vuelve a cargar idéntico; el agente construido desde artefactos responde el caso E810 igual).
 - Aceptación: `make pipeline-local` crea los 4 archivos; `make check` y `make eval` verdes.
 
-### L2. Excel de costes (B-23) — rama `feat/tco-excel`
+### L2. ✅ Excel de costes (B-23) — rama `feat/tco-excel`
 1. `scripts/build_tco_excel.py` con `openpyxl`, salida `cost/emerson_advisor_tco.xlsx`, 4 hojas:
    - **Supuestos:** cada tarifa/horas/volumen en una celda con nombre, unidad, fuente y la marca "SUPUESTO EDITABLE"
      (horas por rol del hackathon y de mantenimiento, tarifa por hora, DBU/hora y precio por DBU de un plan de pago,

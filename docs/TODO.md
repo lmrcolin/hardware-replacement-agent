@@ -192,6 +192,6 @@ BM25, repositorio local, golden set de 22 casos.
 
 ## Hecho (historial)
 
-B-03, B-04 parsing · B-05..B-08 registro, extracción, cruce, chunks · B-09, B-11, B-12 grafo · B-13 BM25 (FAISS pendiente,
+B-02 `bronze.documents_parsed` 33/33 (Kevin) · B-03, B-04 parsing · B-05..B-08 registro, extracción, cruce, chunks · B-09, B-11, B-12 grafo · B-13 BM25 (FAISS pendiente,
 opcional) · B-14..B-17 motor de compatibilidad y ranking · B-18, B-19 LLM y agente · B-20 repositorio local (Kevin) ·
 B-22 golden set y evaluación. Detalle en `docs/DEVELOPMENT_BACKLOG.md` y en el historial de git.

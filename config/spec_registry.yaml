@@ -7,12 +7,17 @@
 # type: number | string | boolean | list | range (range -> <key>_min and <key>_max numbers)
 # unit: canonical unit; values with a convertible unit are converted, incompatible units are discarded.
 # critical: participates in critical compatibility rules (missing ⇒ UNKNOWN, mismatch ⇒ INCOMPATIBLE).
-version: "1.0.0"
+# compare (compatibility engine): gte | lte | eq | interface | has_all | intersects | contains (ranges)
+#   defaults: number→gte, range→contains, list→has_all, string/boolean→eq
+# derive: false → the original's value is informative only (not turned into a requirement)
+# upgrade_condition: when the candidate exceeds the original on this key, compatibility holds only
+#   with this condition (R-UPGRADE). Placeholders: {original} {candidate} {unit}
+version: "1.1.0"
 
 common:
-  subcategory:       {type: string, description: "Second part of the datasheet 'Category: X / Y' header"}
-  datasheet_status:  {type: string, aliases: [product status], description: "Informative only; the catalog is the source of truth"}
-  document_revision: {type: string, aliases: [document revision]}
+  subcategory:       {type: string, derive: false, description: "Second part of the datasheet 'Category: X / Y' header"}
+  datasheet_status:  {type: string, derive: false, aliases: [product status], description: "Informative only; the catalog is the source of truth"}
+  document_revision: {type: string, derive: false, aliases: [document revision]}
 
 categories:
   CPU:
@@ -25,9 +30,10 @@ categories:
     l3_cache:       {unit: MB, type: number, aliases: [l3, l3 cache]}
     memory_channels: {unit: count, type: number, aliases: [ddr5]}
     pcie_lanes:     {unit: count, type: number, aliases: [pcie5, pcie 5.0]}
-    tdp:            {unit: W, type: number, critical: true, aliases: [tdp]}
+    tdp:            {unit: W, type: number, compare: lte, aliases: [tdp]}
     socket:         {type: string, critical: true, patterns: ['Socket (\w+)']}
-    architecture:   {type: string, aliases: [arch], patterns: ['(Armv[\d.]+-?A)', '(Zen \d)']}
+    architecture:   {type: string, critical: true, aliases: [arch], patterns: ['(Armv[\d.]+-?A)', '(Zen \d)'],
+                     description: "ISA/microarchitecture: ARM vs x86 is never a drop-in replacement"}
 
   DAQ:
     analog_inputs:  {unit: count, type: number, critical: true, aliases: [channels], patterns: ['(\d+) single-ended']}
@@ -36,7 +42,7 @@ categories:
     analog_outputs: {unit: count, type: number, aliases: [ao], patterns: ['(\w+) (?:\d+-bit )?analog outputs']}
     digital_io:     {unit: count, type: number, aliases: [dio], patterns: ['(\d+) digital I/O']}
     counters:       {unit: count, type: number, aliases: [counters], patterns: ['(\w+) (?:\d+-bit )?counter']}
-    host_interface: {type: string, critical: true, aliases: [interface], patterns: ['(USB \d\.\d)']}
+    host_interface: {type: string, critical: true, compare: interface, aliases: [interface], patterns: ['(USB \d\.\d)']}
     simultaneous:   {type: boolean, aliases: [simultaneous]}
     supply_voltage: {unit: V, type: number, aliases: [supply]}
 
@@ -47,7 +53,7 @@ categories:
     transceivers:     {unit: count, type: number, aliases: [transceivers]}
     transceiver_rate: {unit: Gb/s, type: number, aliases: [speed]}
     user_io:          {unit: count, type: number, aliases: [io]}
-    process:          {type: string, aliases: [process]}
+    process:          {type: string, derive: false, aliases: [process]}
     package:          {type: string, aliases: [package, package options]}
 
   GPU:
@@ -57,9 +63,9 @@ categories:
     fp64:             {unit: TFLOPS, type: number, aliases: [fp64, peak fp64]}
     fp32:             {unit: TFLOPS, type: number, aliases: [fp32, peak fp32]}
     cuda_cores:       {unit: count, type: number, aliases: [cuda, cuda cores]}
-    tdp:              {unit: W, type: number, critical: true, aliases: [tdp]}
-    host_interface:   {type: string, aliases: [pcie, host interface], patterns: ['(PCIe Gen\d x\d+)']}
-    form_factor:      {type: list, critical: true, aliases: [form factor, form factors]}
+    tdp:              {unit: W, type: number, compare: lte, aliases: [tdp]}
+    host_interface:   {type: string, compare: interface, aliases: [pcie, host interface], patterns: ['(PCIe Gen\d x\d+)']}
+    form_factor:      {type: list, critical: true, compare: intersects, aliases: [form factor, form factors]}
     interconnect:     {type: list, keywords: [NVLink, NVSwitch, Infinity Fabric]}
 
   Memory:
@@ -68,11 +74,11 @@ categories:
     data_rate:    {unit: MT/s, type: number, aliases: [speed]}
     voltage:      {unit: V, type: number, critical: true, aliases: [voltage, vdd/vddq]}
     bandwidth:    {unit: GB/s, type: number, aliases: [bw]}
-    ecc:          {type: string, aliases: [ecc, on-die ecc]}
+    ecc:          {type: string, derive: false, aliases: [ecc, on-die ecc]}
     package:      {type: string, aliases: [package]}
 
   Microcontroller:
-    core:           {type: string, critical: true, aliases: [core, cores]}
+    core:           {type: string, aliases: [core, cores], description: "Different core ⇒ firmware port (condition)"}
     clock:          {unit: MHz, type: number, aliases: [freq]}
     flash:          {unit: KB, type: number, aliases: [flash]}
     sram:           {unit: KB, type: number, critical: true, aliases: [sram]}
@@ -84,16 +90,18 @@ categories:
     package:        {type: string, aliases: [package]}
 
   Network:
-    port_speed:     {unit: Gb/s, type: number, critical: true, aliases: [speed, port speed, port configuration]}
+    port_speed:     {unit: Gb/s, type: number, critical: true, aliases: [speed, port speed, port configuration],
+                     upgrade_condition: "Puertos de {candidate} {unit} (original {original} {unit}): validar ópticas/switch o usar breakout"}
     ports:          {unit: count, type: number, aliases: [ports]}
-    host_interface: {type: string, critical: true, aliases: [pcie, host interface], patterns: ['(PCIe \d\.\d x\d+) host interface']}
+    host_interface: {type: string, critical: true, compare: interface, aliases: [pcie, host interface], patterns: ['(PCIe \d\.\d x\d+) host interface']}
     sriov_vfs:      {unit: count, type: number, aliases: [sriov, sr-iov]}
     rdma:           {type: list, keywords: [RoCE v2, iWARP, InfiniBand]}
     offloads:       {type: list, keywords: [IPsec, TLS, VXLAN, GENEVE, NVGRE, GRE, OVS, NVMe-oF]}
     connector:      {type: string, patterns: ['\b(QSFP\d+)\b']}
-    tdp:            {unit: W, type: number, aliases: [tdp]}
+    tdp:            {unit: W, type: number, compare: lte, aliases: [tdp]}
 
   Power:
+    subcategory:         {type: string, critical: true, description: "Function (VRM, USB PD controller...) from the Category header"}
     output_current:      {unit: A, type: number, critical: true, aliases: [current, continuous output current]}
     input_voltage:       {unit: V, type: range, critical: true, aliases: [vin, input voltage]}
     output_voltage:      {unit: V, type: range, critical: true, aliases: [vout, output voltage]}
@@ -107,16 +115,16 @@ categories:
 
   Sensor:
     measurands: {type: list, critical: true, keywords: [gas, pressure, humidity, temperature, gyroscope, accelerometer]}
-    interface:  {type: list, critical: true, keywords: [I2C, SPI]}
+    interface:  {type: list, critical: true, compare: intersects, keywords: [I2C, SPI]}
     dof:        {type: string, aliases: [dof]}
     package:    {type: string, patterns: ['\b(LGA|QFN)\b']}
 
   Storage:
     capacity:    {unit: TB, type: number, critical: true, aliases: [capacity]}
-    interface:   {type: string, critical: true, aliases: [interface]}
+    interface:   {type: string, critical: true, compare: interface, aliases: [interface]}
     form_factor: {type: string, critical: true, patterns: ['\b(U\.2|M\.2)\b']}
     seq_read:    {unit: MB/s, type: number, aliases: [seq_read, sequential read]}
     seq_write:   {unit: MB/s, type: number, aliases: [seq_write, sequential write]}
     rand_read:   {unit: IOPS, type: number, aliases: [rand_read]}
     endurance:   {unit: DWPD, type: number, aliases: [endurance]}
-    nand:        {type: string, aliases: [nand]}
+    nand:        {type: string, derive: false, aliases: [nand]}

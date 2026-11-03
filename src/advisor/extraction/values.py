@@ -22,7 +22,7 @@ _FAMILIES: dict[str, dict[str, float]] = {
     },
     "bandwidth": {"MB/s": 1, "MBs": 1, "GB/s": 1e3, "GBs": 1e3, "TB/s": 1e6, "TBs": 1e6},
     "link": {"Gb/s": 1, "Gbps": 1, "GbE": 1, "G": 1, "Mbps": 1e-3},
-    "transfer": {"MT/s": 1, "MT": 1, "Mbps": 1},
+    "transfer": {"MT/s": 1, "MT": 1},
     "power": {"W": 1, "mW": 1e-3, "kW": 1e3},
     "voltage": {"V": 1, "mV": 1e-3},
     "current": {"A": 1, "mA": 1e-3, "uA": 1e-6, "µA": 1e-6},

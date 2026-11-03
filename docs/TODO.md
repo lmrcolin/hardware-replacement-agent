@@ -29,10 +29,10 @@ Primer comando:
 make setup
 uv run pytest tests/unit/test_stubs.py -k "compat or category or missing or rank" -rxX
 ```
-- [ ] B-15 `compat_rules.yaml` + `evaluate` (empezar por R-CAT, R-MUST-PROTO, R-MISSING)
-- [ ] B-16 `derive_requirements`
-- [ ] B-17 `rank`
-- [ ] B-14 `CommercialEngine`
+- [x] B-15 `compat_rules.yaml` + `evaluate` (empezar por R-CAT, R-MUST-PROTO, R-MISSING)
+- [x] B-16 `derive_requirements`
+- [x] B-17 `rank`
+- [x] B-14 `CommercialEngine`
 - [x] B-11 `resolve_part` · B-12 `candidate_neighbors`
 - [ ] B-13 BM25 + FAISS
 - [ ] B-18 LLM clients (Template primero) · B-19 `AdvisorAgent.answer` + VERIFY

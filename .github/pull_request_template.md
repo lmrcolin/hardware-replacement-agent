@@ -16,7 +16,7 @@
 - [ ] Quité el `xfail` de los tests de stub que este PR implementa
 - [ ] No hay secretos, tokens ni rutas personales
 - [ ] No invento specs, estados ni precios; el catálogo es la fuente de verdad
-- [ ] Solo toqué módulos de los que soy dueño (o el dueño revisa este PR)
+- [ ] Avisé en el chat del equipo si toqué archivos que otra persona estaba editando
 - [ ] Consultas Databricks acotadas e idempotentes (si aplica)
 
 ## Cómo probarlo

@@ -21,7 +21,7 @@
 | SUBSTITUTE_CANDIDATE | Product → Product | resultado del motor de compatibilidad |
 
 ## Operaciones (contratos)
-`build_graph`, `save`, `load`, `resolve_part`, `candidate_neighbors`. Personalized PageRank para descubrir candidatos: TODO (Dev2), no en bootstrap.
+`build_graph`, `save`, `load`, `resolve_part`, `candidate_neighbors`. Personalized PageRank para descubrir candidatos: TODO, no en bootstrap.
 
 ## Persistencia
 Delta `kg_nodes`/`kg_edges` + `artifacts/graph.json` (node-link de NetworkX).

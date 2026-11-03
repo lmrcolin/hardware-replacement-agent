@@ -1,7 +1,7 @@
 """Expected behaviour of every module contract.
 
 Each test is ``xfail(strict=True, raises=NotImplementedError)`` while the stub is pending.
-When the owner implements the contract the test XPASSes, strict mode fails the run, and the owner
+When a contract is implemented the test XPASSes, strict mode fails the run, and whoever implemented it
 removes the marker. Any other exception (wrong behaviour) fails immediately.
 """
 
@@ -72,7 +72,7 @@ def bare(p: Product) -> Product:
     return p.model_copy(update={"commercial": None})
 
 
-# ---------- Dev1 ----------
+# ---------- Datos ----------
 @pending("B-04")
 def test_discover_documents_finds_33_pdfs() -> None:
     docs = ingestion.discover_documents(PDF_DIR)
@@ -135,7 +135,7 @@ def test_graph_roundtrip(products: dict[str, Product], tmp_path: Path) -> None:
     assert set(loaded.nodes) == set(g.nodes) and loaded.number_of_edges() == g.number_of_edges()
 
 
-# ---------- Dev2 ----------
+# ---------- Inteligencia ----------
 @pending("B-11")
 def test_resolve_part_fuzzy(mock_graph: nx.MultiDiGraph) -> None:
     assert kg.resolve_part(mock_graph, "syn nic 100")[0].part_number == "SYN-NIC-100"
@@ -218,7 +218,7 @@ def test_agent_recommends_only_active(
     assert resp.recommendations and resp.recommendations[0].product.part_number == "SYN-NIC-200"
 
 
-# ---------- Dev3 ----------
+# ---------- Producto ----------
 @pending("B-20")
 def test_local_repository_roundtrip(products: dict[str, Product], tmp_path: Path) -> None:
     repo = LocalParquetRepository(tmp_path)

@@ -1,9 +1,10 @@
-# TODO por dev
+# TODO
 
+Sin responsable fijo: cualquiera toma cualquier tarea y la anuncia en el chat del equipo.
 Cada tarea cierra su test `xfail` en `tests/unit/test_stubs.py` (quitar el marcador al implementar).
 Detalle y dependencias en [DEVELOPMENT_BACKLOG.md](DEVELOPMENT_BACKLOG.md).
 
-## Dev1 — datos (skill: databricks-data-pipeline, pdf-spec-extraction, knowledge-graph)
+## Frente: datos (skills: databricks-data-pipeline, pdf-spec-extraction, knowledge-graph)
 
 Primer comando:
 ```bash
@@ -22,7 +23,7 @@ scripts/bootstrap_databricks.sh --profile emerson --dry-run   # revisar, luego s
 - [ ] B-09 `build_graph` / `save` / `load`
 - [ ] B-10 Notebooks 03–07 + `make pipeline-local`
 
-## Dev2 — inteligencia (skill: compatibility-matching, agentic-rag, knowledge-graph)
+## Frente: inteligencia (skills: compatibility-matching, agentic-rag, knowledge-graph)
 
 Primer comando:
 ```bash
@@ -37,14 +38,13 @@ uv run pytest tests/unit/test_stubs.py -k "compat or category or missing or rank
 - [ ] B-13 BM25 + FAISS
 - [ ] B-18 LLM clients (Template primero) · B-19 `AdvisorAgent.answer` + VERIFY
 
-## Dev3 — producto (skill: streamlit-product, integration-check)
+## Frente: producto (skills: streamlit-product, integration-check)
 
 Primer comando:
 ```bash
 make setup
 uv run streamlit run app/streamlit_app.py   # MockAdvisorAgent
 ```
-- [ ] Sustituir placeholders de `.github/CODEOWNERS` por usuarios reales
 - [ ] B-20 `LocalParquetRepository` (luego `DatabricksSQLRepository`)
 - [ ] B-21 UI final sobre `RecommendationResponse`
 - [ ] B-22 `gold_set.yaml` con casos reales verificados + scoring en `run_eval.py`

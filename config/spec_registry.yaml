@@ -1,4 +1,4 @@
-# Canonical spec keys per category. SKELETON: Dev1 completes keys/aliases from the real datasheets (B-05).
+# Canonical spec keys per category. SKELETON: complete keys/aliases from the real datasheets (B-05).
 # type: number | string | boolean | list | enum ; critical: participates in critical compatibility rules.
 version: "0.1.0"
 categories:

@@ -59,7 +59,7 @@ addopts = "-ra --strict-markers"
 xfail_strict = true
 markers = [
     "contract: model and import-direction contracts (must always pass)",
-    "stub: module contract not implemented yet (xfail until the owner implements it)",
+    "stub: module contract not implemented yet (xfail until implemented)",
     "integration: multi-module tests over fixtures",
     "data: tests over the real PDFs in datos/pdfs",
 ]

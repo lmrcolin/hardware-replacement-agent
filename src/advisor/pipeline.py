@@ -1,6 +1,6 @@
 """Local end-to-end build: PDFs → products/chunks → KG → compatibility matrix → artifacts.
 
-Skeleton only. Each step delegates to its module contract; owners fill them in.
+Skeleton only. Each step delegates to its module contract; fill them in per backlog item.
 """
 
 from __future__ import annotations

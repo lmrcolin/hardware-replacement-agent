@@ -1,4 +1,4 @@
-"""Graph query contracts (owner: Dev2)."""
+"""Graph query contracts."""
 
 from __future__ import annotations
 

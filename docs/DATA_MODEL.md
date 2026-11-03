@@ -22,7 +22,7 @@ Contratos Pydantic v2 en `src/advisor/models/` (`CONTRACT_VERSION = "1.0.0"`). C
 | `Recommendation` / `RecommendationResponse` | salida al usuario | — |
 
 ## Tablas Delta (`datathon.emerson.*`)
-TODO (Dev1): `bronze_documents`, `silver_parsed_pages`, `silver_products`, `silver_specs`, `silver_commercial`,
+TODO: `bronze_documents`, `silver_parsed_pages`, `silver_products`, `silver_specs`, `silver_commercial`,
 `gold_products`, `gold_chunks`, `kg_nodes`, `kg_edges`, `compat_matrix`. Columnas = campos de los modelos.
 
 ## Convenciones

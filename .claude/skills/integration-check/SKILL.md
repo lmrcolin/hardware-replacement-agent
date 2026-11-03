@@ -12,7 +12,7 @@ Verificación, no implementación. No edites código salvo que el usuario lo pid
 
 ## Pasos
 1. `git status` limpio y rama correcta (`develop` o PR hacia `main`).
-2. `make check` (ruff, import-linter, pytest). Contratos verdes; listar xfail restantes por módulo/dueño.
+2. `make check` (ruff, import-linter, pytest). Contratos verdes; listar xfail restantes por módulo y backlog (B-xx).
 3. `git diff --stat main...HEAD -- src/advisor/models` → si hay cambios, exigir etiqueta `contract-change`.
 4. `uv run pre-commit run gitleaks --all-files` → 0 hallazgos.
 5. `make pipeline-local` (o confirmar que `artifacts/` existe) y `make eval` si hay agente real.
@@ -20,7 +20,7 @@ Verificación, no implementación. No edites código salvo que el usuario lo pid
 7. Confirmar invariantes: ninguna recomendación no-ACTIVE; ningún precio en no-ACTIVE; caso E810 correcto.
 
 ## Salida
-Tabla `paso | resultado | evidencia` y veredicto **GO / NO-GO** con bloqueantes por dueño.
+Tabla `paso | resultado | evidencia` y veredicto **GO / NO-GO** con bloqueantes por módulo y backlog.
 
 ## Prohibido
 Marcar GO con tests rojos, secretos detectados o contratos cambiados sin PR `contract-change`.

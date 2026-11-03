@@ -4,7 +4,7 @@
 | Carpeta | Contenido | Política |
 |---|---|---|
 | `tests/contracts/` | modelos e imports | siempre verde |
-| `tests/unit/` | lógica por módulo; stubs marcados `xfail(raises=NotImplementedError)` | el dueño quita el xfail al implementar |
+| `tests/unit/` | lógica por módulo; stubs marcados `xfail(raises=NotImplementedError)` | quien implementa el contrato quita el xfail |
 | `tests/integration/` | flujo sobre fixtures | — |
 | `tests/data/` | sobre PDFs reales (32 filas de catálogo, 32 datasheets) | — |
 

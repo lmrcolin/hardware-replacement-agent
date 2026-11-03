@@ -3,17 +3,17 @@
 ## Ramas
 - `main`: demo estable. Solo merge desde `develop` con `make check` verde.
 - `develop`: integración.
-- `feat/<dev>-<tema>`, `fix/...`, `contract/...` → PR a `develop`.
+- `feat/<tema>`, `fix/...`, `contract/...` → PR a `develop`.
 
 ## Commits
 Conventional Commits: `feat(compatibility): ...`, `fix(parsing): ...`, `chore`, `docs`, `test`, `build`.
 
-## Dueños (ver `.github/CODEOWNERS`)
-- **Dev1 — datos:** ingestion, parsing, extraction, enrichment, chunking, kg/build, notebooks, spec_registry.
-- **Dev2 — inteligencia:** kg/query, retrieval, commercial, compatibility, recommendation, llm, agent, compat_rules.
-- **Dev3 — producto:** models, app, repository, evaluation, fixtures, scripts, cost, CLAUDE.md.
+## Organización
+- **Sin dueños por módulo:** cualquiera de los 3 puede editar cualquier archivo del repo.
+- **Avisar antes de tocar** un archivo que otra persona esté editando (chat del equipo), para evitar conflictos.
+- **Tareas sin responsable fijo:** quien empieza una tarea del backlog (B-xx) la anuncia en el chat.
 
-## Reglas
-- Cambios en `src/advisor/models/` ⇒ PR `contract-change` aprobado por los 3.
-- No tocar módulos ajenos sin avisar al dueño.
+## Reglas que se mantienen
+- Contratos en `src/advisor/models/` y firmas públicas de MODULE_CONTRACTS.md: solo con acuerdo del equipo, vía PR con etiqueta `contract-change`.
+- Reglas duras de CLAUDE.md: catálogo = verdad; el LLM no decide compatibilidad; crítica ⇒ INCOMPATIBLE; solo ACTIVE recomendado; sin secretos.
 - `make check` antes de cada PR; `scripts/smoke_tests.md` antes de merge a `main`.

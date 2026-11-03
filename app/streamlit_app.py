@@ -1,4 +1,4 @@
-"""Streamlit shell backed by MockAdvisorAgent. Final UI is B-21 (Dev3)."""
+"""Streamlit shell backed by MockAdvisorAgent. Final UI is B-21."""
 
 from __future__ import annotations
 

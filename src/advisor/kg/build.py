@@ -1,4 +1,4 @@
-"""Graph construction and persistence contracts (owner: Dev1)."""
+"""Graph construction and persistence contracts."""
 
 from __future__ import annotations
 

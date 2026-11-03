@@ -1,0 +1,74 @@
+[
+  {
+    "part_number": "SYN-NIC-100",
+    "description": "Synthetic 100GbE NIC",
+    "manufacturer": "Synthetic Labs (fictitious)",
+    "category": "Network",
+    "status": "DISCONTINUED",
+    "discontinued_on": null,
+    "last_buy_on": null,
+    "price_usd": null,
+    "stock_units": 0,
+    "inventory_value_usd": null
+  },
+  {
+    "part_number": "SYN-NIC-200",
+    "description": "Synthetic 200GbE NIC",
+    "manufacturer": "Synthetic Labs (fictitious)",
+    "category": "Network",
+    "status": "ACTIVE",
+    "discontinued_on": null,
+    "last_buy_on": null,
+    "price_usd": "900.00",
+    "stock_units": 40,
+    "inventory_value_usd": "36000.00"
+  },
+  {
+    "part_number": "SYN-GPU-100",
+    "description": "Synthetic 80GB accelerator",
+    "manufacturer": "Synthetic Labs (fictitious)",
+    "category": "GPU",
+    "status": "NRND",
+    "discontinued_on": null,
+    "last_buy_on": null,
+    "price_usd": null,
+    "stock_units": 5,
+    "inventory_value_usd": null
+  },
+  {
+    "part_number": "SYN-GPU-200",
+    "description": "Synthetic 96GB accelerator",
+    "manufacturer": "Synthetic Labs (fictitious)",
+    "category": "GPU",
+    "status": "ACTIVE",
+    "discontinued_on": null,
+    "last_buy_on": null,
+    "price_usd": "2500.00",
+    "stock_units": 12,
+    "inventory_value_usd": "30000.00"
+  },
+  {
+    "part_number": "SYN-DAQ-100",
+    "description": "Synthetic USB DAQ",
+    "manufacturer": "Synthetic Labs (fictitious)",
+    "category": "DAQ",
+    "status": "EOL",
+    "discontinued_on": null,
+    "last_buy_on": null,
+    "price_usd": null,
+    "stock_units": 0,
+    "inventory_value_usd": null
+  },
+  {
+    "part_number": "SYN-MCU-100",
+    "description": "Synthetic Cortex-M MCU",
+    "manufacturer": "Synthetic Labs (fictitious)",
+    "category": "Microcontroller",
+    "status": "ACTIVE",
+    "discontinued_on": null,
+    "last_buy_on": null,
+    "price_usd": "4.50",
+    "stock_units": 10000,
+    "inventory_value_usd": "45000.00"
+  }
+]

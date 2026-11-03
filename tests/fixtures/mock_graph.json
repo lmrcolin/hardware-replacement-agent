@@ -1,0 +1,333 @@
+{
+  "directed": true,
+  "multigraph": true,
+  "graph": {},
+  "nodes": [
+    {
+      "node_type": "Product",
+      "label": "SYN-NIC-100",
+      "properties": {},
+      "id": "product:SYN-NIC-100"
+    },
+    {
+      "node_type": "Category",
+      "label": "Network",
+      "properties": {},
+      "id": "category:Network"
+    },
+    {
+      "node_type": "Status",
+      "label": "DISCONTINUED",
+      "properties": {},
+      "id": "status:DISCONTINUED"
+    },
+    {
+      "node_type": "Protocol",
+      "label": "RoCE v2",
+      "properties": {},
+      "id": "protocol:RoCE v2"
+    },
+    {
+      "node_type": "Protocol",
+      "label": "IPsec",
+      "properties": {},
+      "id": "protocol:IPsec"
+    },
+    {
+      "node_type": "Protocol",
+      "label": "VXLAN",
+      "properties": {},
+      "id": "protocol:VXLAN"
+    },
+    {
+      "node_type": "Product",
+      "label": "SYN-NIC-200",
+      "properties": {},
+      "id": "product:SYN-NIC-200"
+    },
+    {
+      "node_type": "Status",
+      "label": "ACTIVE",
+      "properties": {},
+      "id": "status:ACTIVE"
+    },
+    {
+      "node_type": "Protocol",
+      "label": "TLS",
+      "properties": {},
+      "id": "protocol:TLS"
+    },
+    {
+      "node_type": "Product",
+      "label": "SYN-GPU-100",
+      "properties": {},
+      "id": "product:SYN-GPU-100"
+    },
+    {
+      "node_type": "Category",
+      "label": "GPU",
+      "properties": {},
+      "id": "category:GPU"
+    },
+    {
+      "node_type": "Status",
+      "label": "NRND",
+      "properties": {},
+      "id": "status:NRND"
+    },
+    {
+      "node_type": "Product",
+      "label": "SYN-GPU-200",
+      "properties": {},
+      "id": "product:SYN-GPU-200"
+    },
+    {
+      "node_type": "Product",
+      "label": "SYN-DAQ-100",
+      "properties": {},
+      "id": "product:SYN-DAQ-100"
+    },
+    {
+      "node_type": "Category",
+      "label": "DAQ",
+      "properties": {},
+      "id": "category:DAQ"
+    },
+    {
+      "node_type": "Status",
+      "label": "EOL",
+      "properties": {},
+      "id": "status:EOL"
+    },
+    {
+      "node_type": "Product",
+      "label": "SYN-MCU-100",
+      "properties": {},
+      "id": "product:SYN-MCU-100"
+    },
+    {
+      "node_type": "Category",
+      "label": "Microcontroller",
+      "properties": {},
+      "id": "category:Microcontroller"
+    }
+  ],
+  "edges": [
+    {
+      "edge_type": "IN_CATEGORY",
+      "weight": 1.0,
+      "evidence": [],
+      "source": "product:SYN-NIC-100",
+      "target": "category:Network",
+      "key": "IN_CATEGORY"
+    },
+    {
+      "edge_type": "HAS_STATUS",
+      "weight": 1.0,
+      "evidence": [],
+      "source": "product:SYN-NIC-100",
+      "target": "status:DISCONTINUED",
+      "key": "HAS_STATUS"
+    },
+    {
+      "edge_type": "SUPPORTS_PROTOCOL",
+      "weight": 1.0,
+      "evidence": [
+        {
+          "document_id": "9c9df4bc406668fb5d04d4b2f23669facea8d20a307b8a7e0a668c815bd4081f",
+          "page": 1,
+          "chunk_id": "SYN-NIC-100:1:0",
+          "quote": "RDMA: RoCE v2",
+          "scope": "PRODUCT"
+        }
+      ],
+      "source": "product:SYN-NIC-100",
+      "target": "protocol:RoCE v2",
+      "key": "SUPPORTS_PROTOCOL"
+    },
+    {
+      "edge_type": "SUPPORTS_PROTOCOL",
+      "weight": 1.0,
+      "evidence": [
+        {
+          "document_id": "9c9df4bc406668fb5d04d4b2f23669facea8d20a307b8a7e0a668c815bd4081f",
+          "page": 1,
+          "chunk_id": "SYN-NIC-100:1:0",
+          "quote": "Offloads: IPsec, VXLAN",
+          "scope": "PRODUCT"
+        }
+      ],
+      "source": "product:SYN-NIC-100",
+      "target": "protocol:IPsec",
+      "key": "SUPPORTS_PROTOCOL"
+    },
+    {
+      "edge_type": "SUPPORTS_PROTOCOL",
+      "weight": 1.0,
+      "evidence": [
+        {
+          "document_id": "9c9df4bc406668fb5d04d4b2f23669facea8d20a307b8a7e0a668c815bd4081f",
+          "page": 1,
+          "chunk_id": "SYN-NIC-100:1:0",
+          "quote": "Offloads: IPsec, VXLAN",
+          "scope": "PRODUCT"
+        }
+      ],
+      "source": "product:SYN-NIC-100",
+      "target": "protocol:VXLAN",
+      "key": "SUPPORTS_PROTOCOL"
+    },
+    {
+      "edge_type": "SIMILAR_TO",
+      "weight": 0.8,
+      "evidence": [],
+      "source": "product:SYN-NIC-100",
+      "target": "product:SYN-NIC-200",
+      "key": "SIMILAR_TO"
+    },
+    {
+      "edge_type": "IN_CATEGORY",
+      "weight": 1.0,
+      "evidence": [],
+      "source": "product:SYN-NIC-200",
+      "target": "category:Network",
+      "key": "IN_CATEGORY"
+    },
+    {
+      "edge_type": "HAS_STATUS",
+      "weight": 1.0,
+      "evidence": [],
+      "source": "product:SYN-NIC-200",
+      "target": "status:ACTIVE",
+      "key": "HAS_STATUS"
+    },
+    {
+      "edge_type": "SUPPORTS_PROTOCOL",
+      "weight": 1.0,
+      "evidence": [
+        {
+          "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+          "page": 1,
+          "chunk_id": "SYN-NIC-200:1:0",
+          "quote": "RDMA: RoCE v2",
+          "scope": "PRODUCT"
+        }
+      ],
+      "source": "product:SYN-NIC-200",
+      "target": "protocol:RoCE v2",
+      "key": "SUPPORTS_PROTOCOL"
+    },
+    {
+      "edge_type": "SUPPORTS_PROTOCOL",
+      "weight": 1.0,
+      "evidence": [
+        {
+          "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+          "page": 1,
+          "chunk_id": "SYN-NIC-200:1:0",
+          "quote": "Offloads: IPsec, TLS, VXLAN",
+          "scope": "PRODUCT"
+        }
+      ],
+      "source": "product:SYN-NIC-200",
+      "target": "protocol:IPsec",
+      "key": "SUPPORTS_PROTOCOL"
+    },
+    {
+      "edge_type": "SUPPORTS_PROTOCOL",
+      "weight": 1.0,
+      "evidence": [
+        {
+          "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+          "page": 1,
+          "chunk_id": "SYN-NIC-200:1:0",
+          "quote": "Offloads: IPsec, TLS, VXLAN",
+          "scope": "PRODUCT"
+        }
+      ],
+      "source": "product:SYN-NIC-200",
+      "target": "protocol:TLS",
+      "key": "SUPPORTS_PROTOCOL"
+    },
+    {
+      "edge_type": "SUPPORTS_PROTOCOL",
+      "weight": 1.0,
+      "evidence": [
+        {
+          "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+          "page": 1,
+          "chunk_id": "SYN-NIC-200:1:0",
+          "quote": "Offloads: IPsec, TLS, VXLAN",
+          "scope": "PRODUCT"
+        }
+      ],
+      "source": "product:SYN-NIC-200",
+      "target": "protocol:VXLAN",
+      "key": "SUPPORTS_PROTOCOL"
+    },
+    {
+      "edge_type": "IN_CATEGORY",
+      "weight": 1.0,
+      "evidence": [],
+      "source": "product:SYN-GPU-100",
+      "target": "category:GPU",
+      "key": "IN_CATEGORY"
+    },
+    {
+      "edge_type": "HAS_STATUS",
+      "weight": 1.0,
+      "evidence": [],
+      "source": "product:SYN-GPU-100",
+      "target": "status:NRND",
+      "key": "HAS_STATUS"
+    },
+    {
+      "edge_type": "IN_CATEGORY",
+      "weight": 1.0,
+      "evidence": [],
+      "source": "product:SYN-GPU-200",
+      "target": "category:GPU",
+      "key": "IN_CATEGORY"
+    },
+    {
+      "edge_type": "HAS_STATUS",
+      "weight": 1.0,
+      "evidence": [],
+      "source": "product:SYN-GPU-200",
+      "target": "status:ACTIVE",
+      "key": "HAS_STATUS"
+    },
+    {
+      "edge_type": "IN_CATEGORY",
+      "weight": 1.0,
+      "evidence": [],
+      "source": "product:SYN-DAQ-100",
+      "target": "category:DAQ",
+      "key": "IN_CATEGORY"
+    },
+    {
+      "edge_type": "HAS_STATUS",
+      "weight": 1.0,
+      "evidence": [],
+      "source": "product:SYN-DAQ-100",
+      "target": "status:EOL",
+      "key": "HAS_STATUS"
+    },
+    {
+      "edge_type": "IN_CATEGORY",
+      "weight": 1.0,
+      "evidence": [],
+      "source": "product:SYN-MCU-100",
+      "target": "category:Microcontroller",
+      "key": "IN_CATEGORY"
+    },
+    {
+      "edge_type": "HAS_STATUS",
+      "weight": 1.0,
+      "evidence": [],
+      "source": "product:SYN-MCU-100",
+      "target": "status:ACTIVE",
+      "key": "HAS_STATUS"
+    }
+  ]
+}

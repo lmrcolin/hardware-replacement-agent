@@ -1,0 +1,34 @@
+# Gold set for `make eval`. Only VERIFIED cases against datos/pdfs belong here.
+# Schema (validated by evaluation/run_eval.py):
+#   id: str                      unique case id
+#   query: str                   customer text
+#   expected_original: str|null  part number the agent must resolve
+#   expected_status: ACTIVE|DISCONTINUED|EOL|NRND|null   from the catalog
+#   expected_top: list[str]      acceptable ACTIVE substitutes (any of them at rank 1 = hit@1)
+#   expected_level: COMPATIBLE|COMPATIBLE_WITH_CONDITIONS|UNKNOWN|INCOMPATIBLE|null
+#   must_not_recommend: list[str]
+#   expect_clarification: bool
+#   verified_by: str|null        who checked it against the PDFs
+#   notes: str
+version: "0.1.0"
+cases:
+  - id: PLACEHOLDER-01
+    query: "PLACEHOLDER — reemplazar con casos reales verificados"
+    expected_original: null
+    expected_status: null
+    expected_top: []
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: false
+    verified_by: null
+    notes: "PLACEHOLDER — reemplazar con casos reales verificados (p. ej. caso oficial E810)."
+  - id: PLACEHOLDER-02
+    query: "PLACEHOLDER — reemplazar con casos reales verificados"
+    expected_original: null
+    expected_status: null
+    expected_top: []
+    expected_level: null
+    must_not_recommend: []
+    expect_clarification: true
+    verified_by: null
+    notes: "PLACEHOLDER — reemplazar con casos reales verificados (consulta ambigua → CLARIFY)."

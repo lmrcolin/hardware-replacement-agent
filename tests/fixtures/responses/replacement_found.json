@@ -1,0 +1,337 @@
+{
+  "contract_version": "1.0.0",
+  "query": {
+    "text": "Necesito una NIC de 100 GbE con RDMA e IPsec offload. Usábamos la SYN-NIC-100.",
+    "language": "es",
+    "session_id": null
+  },
+  "parsed_query": {
+    "original_text": "Necesito una NIC de 100 GbE con RDMA e IPsec offload. Usábamos la SYN-NIC-100.",
+    "intent": "replace",
+    "part_numbers": [
+      "SYN-NIC-100"
+    ],
+    "category": "Network",
+    "requirements": [
+      {
+        "key": "port_speed",
+        "operator": "GTE",
+        "value": 100,
+        "unit": "Gb/s",
+        "priority": "MUST",
+        "origin": "QUERY"
+      },
+      {
+        "key": "rdma",
+        "operator": "HAS",
+        "value": "RoCE v2",
+        "unit": null,
+        "priority": "MUST",
+        "origin": "QUERY"
+      },
+      {
+        "key": "offloads",
+        "operator": "HAS",
+        "value": "IPsec",
+        "unit": null,
+        "priority": "MUST",
+        "origin": "QUERY"
+      }
+    ],
+    "needs_clarification": false,
+    "clarification_question": null
+  },
+  "original": {
+    "part_number": "SYN-NIC-100",
+    "manufacturer": "Synthetic Labs (fictitious)",
+    "category": "Network",
+    "family": null,
+    "description": "Synthetic 100GbE NIC",
+    "specifications": [
+      {
+        "key": "port_speed",
+        "value": 100,
+        "unit": "Gb/s",
+        "raw_value": null,
+        "evidence": [
+          {
+            "document_id": "9c9df4bc406668fb5d04d4b2f23669facea8d20a307b8a7e0a668c815bd4081f",
+            "page": 1,
+            "chunk_id": "SYN-NIC-100:1:0",
+            "quote": "Port speed: 2x 100GbE",
+            "scope": "PRODUCT"
+          }
+        ]
+      },
+      {
+        "key": "rdma",
+        "value": [
+          "RoCE v2"
+        ],
+        "unit": null,
+        "raw_value": null,
+        "evidence": [
+          {
+            "document_id": "9c9df4bc406668fb5d04d4b2f23669facea8d20a307b8a7e0a668c815bd4081f",
+            "page": 1,
+            "chunk_id": "SYN-NIC-100:1:0",
+            "quote": "RDMA: RoCE v2",
+            "scope": "PRODUCT"
+          }
+        ]
+      },
+      {
+        "key": "offloads",
+        "value": [
+          "IPsec",
+          "VXLAN"
+        ],
+        "unit": null,
+        "raw_value": null,
+        "evidence": [
+          {
+            "document_id": "9c9df4bc406668fb5d04d4b2f23669facea8d20a307b8a7e0a668c815bd4081f",
+            "page": 1,
+            "chunk_id": "SYN-NIC-100:1:0",
+            "quote": "Offloads: IPsec, VXLAN",
+            "scope": "PRODUCT"
+          }
+        ]
+      },
+      {
+        "key": "host_interface",
+        "value": "PCIe 4.0 x16",
+        "unit": null,
+        "raw_value": null,
+        "evidence": [
+          {
+            "document_id": "9c9df4bc406668fb5d04d4b2f23669facea8d20a307b8a7e0a668c815bd4081f",
+            "page": 1,
+            "chunk_id": "SYN-NIC-100:1:0",
+            "quote": "Host: PCIe 4.0 x16",
+            "scope": "PRODUCT"
+          }
+        ]
+      }
+    ],
+    "commercial": {
+      "part_number": "SYN-NIC-100",
+      "description": "Synthetic 100GbE NIC",
+      "manufacturer": "Synthetic Labs (fictitious)",
+      "category": "Network",
+      "status": "DISCONTINUED",
+      "discontinued_on": null,
+      "last_buy_on": null,
+      "price_usd": null,
+      "stock_units": 0,
+      "inventory_value_usd": null
+    },
+    "document_ids": [
+      "9c9df4bc406668fb5d04d4b2f23669facea8d20a307b8a7e0a668c815bd4081f"
+    ],
+    "is_synthetic": true
+  },
+  "recommendations": [
+    {
+      "rank": 1,
+      "product": {
+        "part_number": "SYN-NIC-200",
+        "manufacturer": "Synthetic Labs (fictitious)",
+        "category": "Network",
+        "family": null,
+        "description": "Synthetic 200GbE NIC",
+        "specifications": [
+          {
+            "key": "port_speed",
+            "value": 200,
+            "unit": "Gb/s",
+            "raw_value": null,
+            "evidence": [
+              {
+                "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+                "page": 1,
+                "chunk_id": "SYN-NIC-200:1:0",
+                "quote": "Port speed: 2x 200GbE",
+                "scope": "PRODUCT"
+              }
+            ]
+          },
+          {
+            "key": "rdma",
+            "value": [
+              "RoCE v2"
+            ],
+            "unit": null,
+            "raw_value": null,
+            "evidence": [
+              {
+                "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+                "page": 1,
+                "chunk_id": "SYN-NIC-200:1:0",
+                "quote": "RDMA: RoCE v2",
+                "scope": "PRODUCT"
+              }
+            ]
+          },
+          {
+            "key": "offloads",
+            "value": [
+              "IPsec",
+              "TLS",
+              "VXLAN"
+            ],
+            "unit": null,
+            "raw_value": null,
+            "evidence": [
+              {
+                "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+                "page": 1,
+                "chunk_id": "SYN-NIC-200:1:0",
+                "quote": "Offloads: IPsec, TLS, VXLAN",
+                "scope": "PRODUCT"
+              }
+            ]
+          },
+          {
+            "key": "host_interface",
+            "value": "PCIe 5.0 x16",
+            "unit": null,
+            "raw_value": null,
+            "evidence": [
+              {
+                "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+                "page": 1,
+                "chunk_id": "SYN-NIC-200:1:0",
+                "quote": "Host: PCIe 5.0 x16 (backward compatible)",
+                "scope": "PRODUCT"
+              }
+            ]
+          }
+        ],
+        "commercial": {
+          "part_number": "SYN-NIC-200",
+          "description": "Synthetic 200GbE NIC",
+          "manufacturer": "Synthetic Labs (fictitious)",
+          "category": "Network",
+          "status": "ACTIVE",
+          "discontinued_on": null,
+          "last_buy_on": null,
+          "price_usd": "900.00",
+          "stock_units": 40,
+          "inventory_value_usd": "36000.00"
+        },
+        "document_ids": [
+          "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d"
+        ],
+        "is_synthetic": true
+      },
+      "commercial": {
+        "part_number": "SYN-NIC-200",
+        "description": "Synthetic 200GbE NIC",
+        "manufacturer": "Synthetic Labs (fictitious)",
+        "category": "Network",
+        "status": "ACTIVE",
+        "discontinued_on": null,
+        "last_buy_on": null,
+        "price_usd": "900.00",
+        "stock_units": 40,
+        "inventory_value_usd": "36000.00"
+      },
+      "compatibility": {
+        "original_part_number": "SYN-NIC-100",
+        "candidate_part_number": "SYN-NIC-200",
+        "level": "COMPATIBLE_WITH_CONDITIONS",
+        "rule_results": [
+          {
+            "rule_id": "R-CAT",
+            "severity": "CRITICAL",
+            "outcome": "PASS",
+            "message": "Network = Network",
+            "requirement": null,
+            "original_value": null,
+            "candidate_value": null,
+            "evidence": []
+          },
+          {
+            "rule_id": "R-MUST-PROTO",
+            "severity": "CRITICAL",
+            "outcome": "PASS",
+            "message": "RoCE v2 and IPsec present",
+            "requirement": null,
+            "original_value": null,
+            "candidate_value": null,
+            "evidence": [
+              {
+                "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+                "page": 1,
+                "chunk_id": "SYN-NIC-200:1:0",
+                "quote": "RDMA: RoCE v2",
+                "scope": "PRODUCT"
+              }
+            ]
+          },
+          {
+            "rule_id": "R-UPGRADE",
+            "severity": "MINOR",
+            "outcome": "CONDITIONAL",
+            "message": "200GbE ports; requires 200G-capable optics/switch or breakout",
+            "requirement": null,
+            "original_value": null,
+            "candidate_value": null,
+            "evidence": []
+          }
+        ],
+        "coverage": 1.0,
+        "score": 0.92,
+        "conditions": [
+          "Validate optics/switch for 200GbE or use breakout",
+          "PCIe 5.0 card in PCIe 4.0 slot"
+        ],
+        "missing": []
+      },
+      "covered_requirements": [
+        "port_speed>=100 Gb/s",
+        "rdma HAS RoCE v2",
+        "offloads HAS IPsec"
+      ],
+      "uncovered_requirements": [],
+      "rationale": "Same category, all mandatory protocols present, higher port speed (conditional upgrade).",
+      "evidence": [
+        {
+          "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+          "page": 1,
+          "chunk_id": "SYN-NIC-200:1:0",
+          "quote": "Port speed: 2x 200GbE",
+          "scope": "PRODUCT"
+        },
+        {
+          "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+          "page": 1,
+          "chunk_id": "SYN-NIC-200:1:0",
+          "quote": "RDMA: RoCE v2",
+          "scope": "PRODUCT"
+        },
+        {
+          "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+          "page": 1,
+          "chunk_id": "SYN-NIC-200:1:0",
+          "quote": "Offloads: IPsec, TLS, VXLAN",
+          "scope": "PRODUCT"
+        },
+        {
+          "document_id": "13cf4efda6e9f36d28bcde0026fc46fcf10c1bda2588ea7aa923f04857d55e2d",
+          "page": 1,
+          "chunk_id": "SYN-NIC-200:1:0",
+          "quote": "Host: PCIe 5.0 x16 (backward compatible)",
+          "scope": "PRODUCT"
+        }
+      ]
+    }
+  ],
+  "risky_options": [],
+  "clarification_question": null,
+  "message": "SYN-NIC-100 está DISCONTINUED. Sustituto activo: SYN-NIC-200 (900.00 USD, 40 unidades).",
+  "llm_provider": "template",
+  "warnings": [],
+  "is_synthetic": true
+}

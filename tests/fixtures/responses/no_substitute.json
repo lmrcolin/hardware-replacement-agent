@@ -1,0 +1,98 @@
+{
+  "contract_version": "1.0.0",
+  "query": {
+    "text": "Reemplazo para SYN-DAQ-100",
+    "language": "es",
+    "session_id": null
+  },
+  "parsed_query": {
+    "original_text": "Reemplazo para SYN-DAQ-100",
+    "intent": "replace",
+    "part_numbers": [
+      "SYN-DAQ-100"
+    ],
+    "category": "DAQ",
+    "requirements": [],
+    "needs_clarification": false,
+    "clarification_question": null
+  },
+  "original": {
+    "part_number": "SYN-DAQ-100",
+    "manufacturer": "Synthetic Labs (fictitious)",
+    "category": "DAQ",
+    "family": null,
+    "description": "Synthetic USB DAQ",
+    "specifications": [
+      {
+        "key": "analog_inputs",
+        "value": 16,
+        "unit": "count",
+        "raw_value": null,
+        "evidence": [
+          {
+            "document_id": "0711ad2b50b24f5c38e8aa76df337b17bbc368a0444777ea014ae05b5774fbe9",
+            "page": 1,
+            "chunk_id": "SYN-DAQ-100:1:0",
+            "quote": "16 analog inputs",
+            "scope": "PRODUCT"
+          }
+        ]
+      },
+      {
+        "key": "resolution",
+        "value": 16,
+        "unit": "bit",
+        "raw_value": null,
+        "evidence": [
+          {
+            "document_id": "0711ad2b50b24f5c38e8aa76df337b17bbc368a0444777ea014ae05b5774fbe9",
+            "page": 1,
+            "chunk_id": "SYN-DAQ-100:1:0",
+            "quote": "Resolution: 16 bits",
+            "scope": "PRODUCT"
+          }
+        ]
+      },
+      {
+        "key": "host_interface",
+        "value": "USB 2.0",
+        "unit": null,
+        "raw_value": null,
+        "evidence": [
+          {
+            "document_id": "0711ad2b50b24f5c38e8aa76df337b17bbc368a0444777ea014ae05b5774fbe9",
+            "page": 1,
+            "chunk_id": "SYN-DAQ-100:1:0",
+            "quote": "Interface: USB 2.0",
+            "scope": "PRODUCT"
+          }
+        ]
+      }
+    ],
+    "commercial": {
+      "part_number": "SYN-DAQ-100",
+      "description": "Synthetic USB DAQ",
+      "manufacturer": "Synthetic Labs (fictitious)",
+      "category": "DAQ",
+      "status": "EOL",
+      "discontinued_on": null,
+      "last_buy_on": null,
+      "price_usd": null,
+      "stock_units": 0,
+      "inventory_value_usd": null
+    },
+    "document_ids": [
+      "0711ad2b50b24f5c38e8aa76df337b17bbc368a0444777ea014ae05b5774fbe9"
+    ],
+    "is_synthetic": true
+  },
+  "recommendations": [],
+  "risky_options": [],
+  "clarification_question": null,
+  "message": "SYN-DAQ-100 está EOL y no hay sustituto ACTIVE compatible en el catálogo.",
+  "llm_provider": "template",
+  "warnings": [
+    "No ACTIVE product in category DAQ"
+  ],
+  "is_synthetic": true
+}

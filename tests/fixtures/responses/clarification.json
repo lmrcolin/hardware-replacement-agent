@@ -1,0 +1,25 @@
+{
+  "contract_version": "1.0.0",
+  "query": {
+    "text": "Necesito un reemplazo para la tarjeta",
+    "language": "es",
+    "session_id": null
+  },
+  "parsed_query": {
+    "original_text": "Necesito un reemplazo para la tarjeta",
+    "intent": "replace",
+    "part_numbers": [],
+    "category": null,
+    "requirements": [],
+    "needs_clarification": true,
+    "clarification_question": "¿Qué part number o categoría?"
+  },
+  "original": null,
+  "recommendations": [],
+  "risky_options": [],
+  "clarification_question": "¿Qué part number o categoría de producto necesitas reemplazar?",
+  "message": "Necesito más información para buscar un sustituto.",
+  "llm_provider": "template",
+  "warnings": [],
+  "is_synthetic": true
+}

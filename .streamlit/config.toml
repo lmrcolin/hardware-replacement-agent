@@ -1,34 +1,21 @@
-# Tema del agente (claro y oscuro según el sistema). Tokens y componentes: app/static/design.css.
+# Tema del agente: claro siempre, azul rey Emerson. Tokens y componentes: app/static/design.css.
 [theme]
+base = "light"
+primaryColor = "#2741C4"
+backgroundColor = "#FBFBFD"
+secondaryBackgroundColor = "#F2F2F5"
+textColor = "#1D1D1F"
+linkColor = "#2741C4"
+borderColor = "#E5E5EA"
 baseRadius = "10px"
 showWidgetBorder = false
 showSidebarBorder = false
 font = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, 'Segoe UI', system-ui, sans-serif"
 baseFontSize = 15
 
-[theme.light]
-primaryColor = "#0A7E77"
-backgroundColor = "#FBFBFD"
-secondaryBackgroundColor = "#F2F2F5"
-textColor = "#1D1D1F"
-linkColor = "#0A7E77"
-borderColor = "#E5E5EA"
-
-[theme.light.sidebar]
+[theme.sidebar]
 backgroundColor = "#F5F5F7"
 secondaryBackgroundColor = "#EBEBEF"
-
-[theme.dark]
-primaryColor = "#3CC9BC"
-backgroundColor = "#1C1C1E"
-secondaryBackgroundColor = "#2C2C2E"
-textColor = "#F5F5F7"
-linkColor = "#3CC9BC"
-borderColor = "#3A3A3C"
-
-[theme.dark.sidebar]
-backgroundColor = "#161618"
-secondaryBackgroundColor = "#2C2C2E"
 
 [client]
 toolbarMode = "minimal"

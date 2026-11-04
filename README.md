@@ -175,6 +175,17 @@ Y en conversaciones nuevas (botón "Nueva conversación" arriba a la derecha):
 
 En la terminal donde corre, pulsa `Ctrl+C`.
 
+### Opcional (Windows): dejar la aplicación siempre activa
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/app_service.ps1 -Action install   # o: make app-service
+```
+
+Registra la tarea programada `EmersonAdvisorApp`, que arranca la aplicación al iniciar sesión y la relanza si se cae.
+Queda en **http://127.0.0.2:8601**, sin terminal abierta y sin depender de VS Code. Usa `127.0.0.2` porque VS Code Remote-SSH ocupa muchos puertos de `127.0.0.1`. Otras
+acciones: `-Action status`, `restart`, `stop`, `logs` y `uninstall` (quita la tarea). El log está en
+`%LOCALAPPDATA%\EmersonAdvisor\app.log`.
+
 ---
 
 ## 4. Verificar la instalación
@@ -458,6 +469,7 @@ existencias salen solo de las herramientas deterministas y del catálogo.
 |---|---|---|
 | `uv: command not found` | uv no está instalado o la terminal no lo ve todavía | Instálalo (sección 2) y abre una terminal nueva |
 | `make: command not found` (Windows) | Windows no trae make | Usa los equivalentes de la sección 8 |
+| `localhost:8501` se queda cargando y nunca abre | VS Code Remote-SSH reenvía puertos del servidor remoto (8501, 8601...) en `127.0.0.1` y atrapa la conexión | Abre `http://[::1]:8501`, detén el reenvío en el panel **Ports** de VS Code, o usa la aplicación siempre activa en `http://127.0.0.2:8601` (sección 3, paso 6) |
 | `Port 8501 is already in use` | Ya hay otra instancia de la aplicación abierta | Ciérrala con `Ctrl+C`, o añade `--server.port 8502` al final del comando de la sección 8 y abre `http://localhost:8502` |
 | La primera carga tarda | Se están procesando los 33 PDFs | Espera unos segundos; para acelerar los arranques siguientes, ejecuta `make pipeline-local` una vez |
 | No aparece el micrófono | El modelo de voz aún se está descargando | Espera a que en Ajustes desaparezca "Preparando el reconocimiento de voz" |

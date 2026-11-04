@@ -1,14 +1,18 @@
-"""Provider chain with fallback: databricks → ollama → template (always last)."""
+"""Provider chain with fallback (configured order, e.g. anthropic → databricks → ollama), with the
+template always last."""
 
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Sequence
+from importlib.util import find_spec
 
 from pydantic import BaseModel, ValidationError
 
 from advisor.config import Settings
 from advisor.llm.base import (
+    AnthropicClient,
     DatabricksFMAPIClient,
     LLMClient,
     LLMUnavailableError,
@@ -41,6 +45,11 @@ def _wants_databricks(settings: Settings) -> bool:
     return on_databricks and _databricks_configured(None)
 
 
+def _anthropic_configured() -> bool:
+    """SDK installed (``uv sync --extra claude``) and a key in the environment / .env."""
+    return find_spec("anthropic") is not None and bool(os.environ.get("ANTHROPIC_API_KEY"))
+
+
 def build_llm_chain(settings: Settings) -> list[LLMClient]:
     """Configured providers that can actually answer; TemplateClient is always appended."""
     chain: list[LLMClient] = []
@@ -50,6 +59,14 @@ def build_llm_chain(settings: Settings) -> list[LLMClient]:
                 DatabricksFMAPIClient(
                     settings.llm.databricks_endpoint,
                     settings.databricks.profile,
+                    settings.llm.timeout_s,
+                )
+            )
+        elif name == "anthropic" and _anthropic_configured():
+            chain.append(
+                AnthropicClient(
+                    settings.llm.anthropic_model,
+                    settings.llm.anthropic_effort,
                     settings.llm.timeout_s,
                 )
             )

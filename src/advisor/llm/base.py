@@ -74,6 +74,67 @@ class DatabricksFMAPIClient(LLMClient):
         return self._chat(prompt).strip()
 
 
+class AnthropicClient(LLMClient):
+    """Claude via the official Anthropic SDK (optional extra ``claude``; key in ANTHROPIC_API_KEY).
+
+    NLU uses structured outputs (``messages.parse`` with the Pydantic schema), so the answer is
+    validated JSON by construction; NLG returns plain text that the agent's VERIFY step checks.
+    Any API error, refusal or truncation raises LLMUnavailableError: the chain moves on to the
+    next provider (ending in the template), exactly as with the other clients.
+    """
+
+    name = "anthropic"
+
+    def __init__(self, model: str, effort: str = "low", timeout_s: float = 30.0) -> None:
+        self.model, self.effort, self.timeout_s = model, effort, timeout_s
+        self._client: Any = None
+
+    def _api(self) -> Any:
+        if self._client is None:
+            import anthropic  # optional dependency: uv sync --extra claude
+
+            self._client = anthropic.Anthropic(timeout=self.timeout_s, max_retries=1)
+        return self._client
+
+    def _request(self, prompt: str) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "max_tokens": 8000,  # adaptive thinking shares this budget; answers are short
+            "output_config": {"effort": self.effort},
+            "messages": [{"role": "user", "content": prompt}],
+        }
+
+    @staticmethod
+    def _check(response: Any) -> None:
+        if response.stop_reason == "refusal":
+            raise LLMUnavailableError("anthropic: refusal")
+        if response.stop_reason == "max_tokens":
+            raise LLMUnavailableError("anthropic: answer truncated (max_tokens)")
+
+    def complete_json[T: BaseModel](self, prompt: str, schema: type[T]) -> T:
+        import anthropic
+
+        try:
+            response = self._api().messages.parse(**self._request(prompt), output_format=schema)
+        except anthropic.APIError as exc:
+            raise LLMUnavailableError(f"anthropic: {exc}") from exc
+        self._check(response)
+        parsed = response.parsed_output
+        if parsed is None:
+            raise LLMUnavailableError("anthropic: no structured output")
+        return schema.model_validate(parsed)
+
+    def generate(self, prompt: str) -> str:
+        import anthropic
+
+        try:
+            response = self._api().messages.create(**self._request(prompt))
+        except anthropic.APIError as exc:
+            raise LLMUnavailableError(f"anthropic: {exc}") from exc
+        self._check(response)
+        return "".join(b.text for b in response.content if b.type == "text").strip()
+
+
 class OllamaClient(LLMClient):
     """Local Ollama (qwen3:4b) over HTTP."""
 

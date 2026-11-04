@@ -6,10 +6,16 @@ from pydantic import Field, model_validator
 
 from advisor.models.base import Contract
 from advisor.models.compatibility import CompatibilityResult
+from advisor.models.conversation import ToolCall
 from advisor.models.documents import Evidence
 from advisor.models.enums import CommercialStatus, CompatibilityLevel
 from advisor.models.products import CommercialInformation, Product
-from advisor.models.query import CustomerQuery, ParsedQuery
+from advisor.models.query import (
+    ConversationContext,
+    CustomerQuery,
+    ParsedQuery,
+    TechnicalRequirement,
+)
 from advisor.models.version import CONTRACT_VERSION
 
 
@@ -37,6 +43,22 @@ class Recommendation(Contract):
 CONFIRMED_LEVELS = (CompatibilityLevel.COMPATIBLE, CompatibilityLevel.COMPATIBLE_WITH_CONDITIONS)
 
 
+class Relaxation(Contract):
+    """A sale that becomes possible if the customer drops one requirement (never a recommendation:
+    it does NOT meet what was asked)."""
+
+    dropped: TechnicalRequirement
+    option: Recommendation
+
+    @model_validator(mode="after")
+    def _sellable(self) -> Relaxation:
+        if self.option.commercial.status is not CommercialStatus.ACTIVE:
+            raise ValueError("relaxation options must be ACTIVE")
+        if self.option.compatibility.level not in CONFIRMED_LEVELS:
+            raise ValueError("relaxation options must be confirmed once the requirement is dropped")
+        return self
+
+
 class RecommendationResponse(Contract):
     contract_version: str = CONTRACT_VERSION
     query: CustomerQuery
@@ -48,6 +70,11 @@ class RecommendationResponse(Contract):
     # (ADR-013); they need expert validation.
     unverified_options: list[Recommendation] = []
     clarification_question: str | None = None
+    clarification_options: list[str] = []  # quick answers offered with the question (1.2.0)
+    relaxations: list[Relaxation] = []  # options if one requirement is dropped (1.2.0)
+    citations: list[Evidence] = []  # datasheet passages behind a technical answer (1.2.0)
+    tool_calls: list[ToolCall] = []  # what the agent did, in order (1.2.0)
+    context: ConversationContext | None = None  # memory to send with the next turn (1.2.0)
     message: str
     llm_provider: str = "template"
     warnings: list[str] = []

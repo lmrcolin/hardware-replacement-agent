@@ -2,6 +2,7 @@
 
 from advisor.models.base import Contract, DataConsistencyWarning
 from advisor.models.compatibility import CandidateProduct, CompatibilityResult, RuleResult
+from advisor.models.conversation import ToolCall
 from advisor.models.documents import (
     Chunk,
     ChunkHit,
@@ -35,8 +36,13 @@ from advisor.models.products import (
     ProductSpecification,
     SpecValue,
 )
-from advisor.models.query import CustomerQuery, ParsedQuery, TechnicalRequirement
-from advisor.models.recommendation import Recommendation, RecommendationResponse
+from advisor.models.query import (
+    ConversationContext,
+    CustomerQuery,
+    ParsedQuery,
+    TechnicalRequirement,
+)
+from advisor.models.recommendation import Recommendation, RecommendationResponse, Relaxation
 from advisor.models.version import CONTRACT_VERSION
 
 __all__ = [
@@ -51,6 +57,7 @@ __all__ = [
     "CompatibilityLevel",
     "CompatibilityResult",
     "Contract",
+    "ConversationContext",
     "CustomerQuery",
     "DataConsistencyWarning",
     "DiscoveryPath",
@@ -73,10 +80,12 @@ __all__ = [
     "ProductSpecification",
     "Recommendation",
     "RecommendationResponse",
+    "Relaxation",
     "RequirementOrigin",
     "RuleOutcome",
     "RuleResult",
     "Severity",
     "SpecValue",
     "TechnicalRequirement",
+    "ToolCall",
 ]

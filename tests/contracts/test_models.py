@@ -68,7 +68,7 @@ def _result(level: CompatibilityLevel, *rules: RuleResult, cand: str = "B") -> C
 
 
 def test_contract_version_is_semver() -> None:
-    assert CONTRACT_VERSION == "1.1.0"
+    assert CONTRACT_VERSION == "1.2.0"
 
 
 class TestCommercial:

@@ -299,10 +299,15 @@ def test_history_helpers(tmp_path: Path) -> None:
         "not json",
     ]
     trends = history.trending([r for r in rows if isinstance(r, dict)], now=now)
-    assert [(t.topic, t.total, t.previous, t.direction) for t in trends] == [
-        ("E810-CQDA2", 2, 0, "up"),
-        ("A100-SXM4-80GB", 1, 2, "down"),
-        ("GPU", 1, 0, "up"),
+    assert [(t.topic, t.total, t.previous, t.direction, t.is_part) for t in trends] == [
+        ("E810-CQDA2", 2, 0, "new", True),
+        ("A100-SXM4-80GB", 1, 2, "down", True),
+        ("GPU", 1, 0, "new", False),
+    ]
+    assert [t.change for t in trends] == [
+        "nueva esta semana",
+        "\u22121 vs. semana previa",
+        "nueva esta semana",
     ]
     log = history.SearchLog(tmp_path / "log.jsonl")
     for r in rows[:6]:
@@ -319,3 +324,118 @@ def test_history_helpers(tmp_path: Path) -> None:
         "e810 por favor",
         "Intel E810",
     ]
+
+
+def test_history_time_unidentified_and_clear(tmp_path: Path) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    history = _component("history")
+    now = datetime(2026, 11, 3, 18, 0, tzinfo=UTC)
+
+    def ago(**delta: float) -> str:
+        return (now - timedelta(**delta)).isoformat()
+
+    assert [
+        history.relative_time(ago(seconds=20), now),
+        history.relative_time(ago(minutes=5), now),
+        history.relative_time(ago(hours=3), now),
+        history.relative_time(ago(hours=30), now),
+        history.relative_time(ago(days=4), now),
+        history.relative_time(ago(days=22), now),
+        history.relative_time(ago(days=400), now),
+        history.relative_time(ago(minutes=-3), now),  # clock skew: never "in the future"
+        history.relative_time("not a date", now),
+    ] == [
+        "hace un momento",
+        "hace 5 min",
+        "hace 3 h",
+        "ayer",
+        "hace 4 días",
+        "12 oct",
+        "29 sep 2025",
+        "hace un momento",
+        "",
+    ]
+    trend = history.Trend
+    assert [
+        trend("X", 3, 1, "x").change,
+        trend("X", 2, 2, "x").change,
+        trend("X", 1, 4, "x").change,
+    ] == ["+2 vs. semana previa", "igual que la semana previa", "\u22123 vs. semana previa"]
+
+    def row(days_ago: float, text: str, part: str | None, category: str | None) -> dict:  # type: ignore[type-arg]
+        return {"type": "search", "ts": ago(days=days_ago), "text": text, "sent": text,
+                "part": part, "category": category, "outcome": "clarify"}  # fmt: skip
+
+    rows = [
+        row(1, "Hola, uno, dos, tres, probando", None, None),
+        row(1, "Reemplazo para la E81O-CQDA2", None, None),
+        row(9, "hola de nuevo", None, None),  # outside the window
+        row(1, "Necesito reemplazar la USB-2627", "USB-2627", "DAQ"),
+    ]
+    assert [t.topic for t in history.trending(rows, now=now)] == ["USB-2627"]
+    assert history.unidentified(rows, now=now) == 2
+    assert len(history.recent(rows)) == 4  # recent keeps every question, recognised or not
+
+    log = history.SearchLog(tmp_path / "log.jsonl")
+    log.clear()  # nothing to clear: no error, no backup
+    assert not log.path.with_name("log.jsonl.bak").exists()
+    for r in rows:
+        log.append(r)
+    log.clear()
+    assert log.read() == []
+    assert len(history.SearchLog(tmp_path / "log.jsonl.bak").read()) == 4  # one level of undo
+
+
+def test_sidebar_explains_topics_results_and_can_be_cleared(_isolated_search_log: Path) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime.now(UTC)
+    seeded = [
+        ("Necesito reemplazar la E810-CQDA2", "E810-CQDA2", "Network", "recommended", 30),
+        ("Busco una GPU de 80GB", None, "GPU", "recommended", 20),
+        ("Hola, hola, uno, dos, tres, probando", None, None, "clarify", 10),
+    ]
+    _isolated_search_log.write_text(
+        "".join(
+            json.dumps(
+                {
+                    "type": "search",
+                    "id": f"t{i}",
+                    "text": text,
+                    "sent": text,
+                    "part": part,
+                    "category": cat,
+                    "outcome": result,
+                    "source": REAL,
+                    "ts": (now - timedelta(minutes=minutes)).isoformat(),
+                }
+            )
+            + "\n"
+            for i, (text, part, cat, result, minutes) in enumerate(seeded)
+        )
+        + json.dumps({"type": "feedback", "id": "t0", "useful": True})
+        + "\n",
+        encoding="utf-8",
+    )
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    assert not at.exception
+    labels = {b.key: b.label for b in at.sidebar.button}
+    assert labels["trend-ask-0"] == "E810-CQDA2"
+    assert labels["trend-ask-1"] == "GPU"  # category searched by requirements, in Spanish
+    assert labels["recent-0"] == "Hola, hola, uno, dos, tres, probando"
+    side = " ".join(m.value for m in at.sidebar.markdown)
+    # what the part is and its status come from the catalog (source of truth)
+    assert "Intel E810 100GbE" in side and "DISCONTINUED" in side
+    assert "Categoría · búsqueda por requisitos" in side
+    assert "nueva esta semana" in side
+    assert "hace 30 min" in side and "con sustituto" in side and "pidió aclaración" in side
+    assert "1 de 1 respuestas valoradas fueron útiles" in side
+    notes = " ".join(c.value for c in at.sidebar.caption)
+    assert "1 consulta sin pieza ni categoría" in notes  # the greeting does not rank
+    at.button(key="history-clear").click().run()
+    assert not at.exception
+    assert not [b for b in at.sidebar.button if b.key and b.key.startswith(("trend-", "recent-"))]
+    notes = " ".join(c.value for c in at.sidebar.caption)
+    assert "Aún no hay búsquedas esta semana" in notes and "Tus consultas aparecerán aquí" in notes
+    assert _isolated_search_log.with_name(_isolated_search_log.name + ".bak").is_file()

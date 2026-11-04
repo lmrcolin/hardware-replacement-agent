@@ -316,6 +316,17 @@ def recommendation_card(rec: Recommendation, names: dict[str, str], *, key: str)
                 st.caption(f"{source} · p.{ev.page} — “{ev.quote}”")
 
 
+def sales_potential(recommendations: Sequence[Recommendation]) -> tuple[int, Decimal]:
+    """Units in stock and their catalog value (price * stock) across the recommended options."""
+    units, value = 0, Decimal(0)
+    for rec in recommendations:
+        c = rec.commercial
+        if c.price_usd is not None and c.stock_units:
+            units += c.stock_units
+            value += c.price_usd * c.stock_units
+    return units, value
+
+
 def expert_summary(response: RecommendationResponse) -> str:
     """Plain-text summary for escalation to a human expert (copy only; nothing is sent)."""
     lines = [f"Consulta: {response.query.text}"]
@@ -339,6 +350,9 @@ def response_view(response: RecommendationResponse, names: dict[str, str], *, tu
     if response.is_synthetic:
         st.warning("Respuesta generada con datos sintéticos de prueba.")
     if response.clarification_question:
+        # The agent may list what is for sale (vague query) before asking; show it.
+        if "\n" in response.message:
+            st.markdown(response.message.replace("\n", "  \n"))
         st.info(response.clarification_question)
         return
     st.markdown(response.message.replace("\n", "  \n"))
@@ -349,6 +363,13 @@ def response_view(response: RecommendationResponse, names: dict[str, str], *, tu
         st.markdown(f"##### {title}")
         for rec in response.recommendations:
             recommendation_card(rec, names, key=f"{turn}-rec-{rec.rank}")
+        units, value = sales_potential(response.recommendations)
+        if units:
+            st.caption(
+                f"Impacto comercial: {units:,} unidades ACTIVE disponibles en estas opciones, "
+                f"{value:,.2f} USD a precio de catálogo (precio por stock): la venta no se pierde "
+                "por la pieza descontinuada."
+            )
     open_caveats = not response.recommendations
     if response.risky_options:
         with st.expander(

@@ -96,3 +96,9 @@ def test_warm_up_loads_in_the_background_and_reports_status(
             break
         time.sleep(0.02)
     assert voice.status() == "ready"
+
+
+def test_stylesheet_survives_the_html_sanitizer() -> None:
+    """DOMPurify drops a <style> whose text looks like markup ("<key>"): keep the CSS free of '<'."""
+    css = (Path(__file__).resolve().parents[2] / "app" / "static" / "design.css").read_text()
+    assert "<" not in css

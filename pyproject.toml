@@ -41,6 +41,9 @@ advisor-pipeline = "advisor.pipeline:main"
 voice = [
     "faster-whisper>=1.1",
 ]
+claude = [
+    "anthropic>=2.4.0",
+]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

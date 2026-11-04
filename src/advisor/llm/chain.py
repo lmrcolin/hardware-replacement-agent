@@ -51,7 +51,9 @@ def claude_status() -> str:
         return f"falta {CLAUDE_KEY_ENV} en .env"
     try:
         from advisor.llm import claude  # noqa: F401  (client implemented by the team: llm/claude.py)
-    except ImportError:
+    except ImportError as exc:
+        if exc.name == "anthropic":
+            return "falta el SDK de Anthropic: uv sync --extra claude"
         return "falta el cliente advisor.llm.claude.ClaudeClient"
     return "ready"
 

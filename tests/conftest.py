@@ -3,7 +3,20 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
+
+# Tests never use the developer's local .env (paid LLM providers, real keys): set before any
+# settings load, because load_dotenv(override=False) keeps values that are already set.
+os.environ["ADVISOR_LLM_PROVIDERS"] = "template"
+os.environ["ANTHROPIC_API_KEY"] = ""
+os.environ["ADVISOR_LLM_DEFAULT"] = "ours"
+# ...nor the developer's search history: a session-wide throwaway log (tests that need their own
+# log override it per test). Without this, a test that clicks "Borrar historial" wiped the real one.
+os.environ["ADVISOR_SEARCH_LOG"] = os.path.join(
+    tempfile.mkdtemp(prefix="advisor-tests-"), "searches.jsonl"
+)
 
 import networkx as nx
 import pytest

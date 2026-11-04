@@ -2,7 +2,7 @@ UV ?= uv
 # Perfil del Databricks CLI; vacío = perfil por defecto de `databricks auth login`.
 PROFILE ?=
 
-.PHONY: help setup install check lint format imports typecheck test test-contracts pipeline-local eval eval-blind eval-databricks app app-databricks excel clean
+.PHONY: help setup install check lint format imports typecheck test test-contracts pipeline-local eval eval-blind eval-databricks app app-databricks app-service app-service-stop app-service-status excel clean
 
 help:
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -47,6 +47,17 @@ eval-blind: ## Run evaluation over the blind set (evaluation/blind_set.yaml)
 
 app: ## Streamlit chat UI over the real agent (artifacts/ or in-memory build; voice extra)
 	$(UV) run --extra voice --extra claude streamlit run app/streamlit_app.py
+
+APP_SERVICE = powershell -NoProfile -ExecutionPolicy Bypass -File scripts/app_service.ps1
+
+app-service: ## Windows: always-on app at http://127.0.0.2:8601 (logon task, auto-restart)
+	$(APP_SERVICE) -Action install
+
+app-service-stop: ## Windows: stop and remove the app-service task
+	$(APP_SERVICE) -Action uninstall
+
+app-service-status: ## Windows: task state and health of http://127.0.0.2:8601
+	$(APP_SERVICE) -Action status
 
 DATABRICKS_ENV = ADVISOR_DATABRICKS_PROFILE=$(PROFILE) ADVISOR_REPOSITORY_BACKEND=databricks_sql \
 	ADVISOR_RETRIEVAL_BACKEND=hybrid ADVISOR_LLM_PROVIDERS=databricks,template

@@ -1,6 +1,5 @@
 /* Agente de reemplazo Emerson — sistema de diseño (único archivo de estilos de la app).
-   Tokens en :root; modo oscuro por prefers-color-scheme (el tema de Streamlit hace lo mismo en
-   .streamlit/config.toml). Los elementos propios se seleccionan por las clases st-key-(clave) que
+   Tokens en :root; tema claro siempre (igual que .streamlit/config.toml), acento azul rey Emerson. Los elementos propios se seleccionan por las clases st-key-(clave) que
    Streamlit añade a contenedores y widgets con clave; nada depende de su markup interno salvo
    el input del chat, el encabezado y la barra lateral (data-testid estables). */
 
@@ -16,11 +15,11 @@
   --text-2: #6E6E73;
   --text-3: #6E6E73;  /* ≥ 4.5:1 sobre el fondo (AA en texto pequeño) */
   --hairline: rgba(29, 29, 31, .08);
-  --accent: #0A7E77;
-  --accent-hover: #086B65;
+  --accent: #2741C4;        /* azul rey Emerson */
+  --accent-hover: #1B2E8F;  /* azul marino */
   --accent-text: #FFFFFF;
-  --accent-soft: rgba(10, 126, 119, .10);
-  --focus: rgba(10, 126, 119, .45);
+  --accent-soft: rgba(39, 65, 196, .10);
+  --focus: rgba(39, 65, 196, .45);
   --material: rgba(251, 251, 253, .72);
   /* semánticos (fondo tintado ~12 %, texto en el tono oscuro del mismo color) */
   --red-bg: rgba(215, 0, 21, .10);     --red-fg: #B3261E;
@@ -46,35 +45,6 @@
   /* layout */
   --reading: 680px;
   --page: 1120px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1C1C1E;
-    --bg-sidebar: #161618;
-    --surface: #2C2C2E;
-    --surface-2: #2C2C2E;
-    --fill: rgba(255, 255, 255, .06);
-    --fill-hover: rgba(255, 255, 255, .10);
-    --text: #F5F5F7;
-    --text-2: #A1A1A6;
-    --text-3: #8E8E93;
-    --hairline: rgba(245, 245, 247, .10);
-    --accent: #3CC9BC;
-    --accent-hover: #5CD6CB;
-    --accent-text: #00201D;
-    --accent-soft: rgba(60, 201, 188, .16);
-    --focus: rgba(60, 201, 188, .55);
-    --material: rgba(28, 28, 30, .72);
-    --red-bg: rgba(255, 69, 58, .18);   --red-fg: #FF8A80;
-    --orange-bg: rgba(255, 159, 10, .18); --orange-fg: #FFB55C;
-    --amber-bg: rgba(255, 214, 10, .16);  --amber-fg: #FFD966;
-    --green-bg: rgba(48, 209, 88, .16);   --green-fg: #7EE29B;
-    --gray-bg: rgba(152, 152, 157, .18);  --gray-fg: #C7C7CC;
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, .3);
-    --shadow-2: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
-    --shadow-3: 0 2px 6px rgba(0, 0, 0, .35), 0 16px 40px rgba(0, 0, 0, .45);
-  }
 }
 
 /* ------------------------------------------------------------------ base */
@@ -302,6 +272,7 @@ table.specs .fail { color: var(--red-fg); } table.specs .miss { color: var(--tex
   border-radius: 50%; background: var(--accent); color: var(--accent-text); min-width: 32px; min-height: 32px;
   transition: background var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease);
 }
+[data-testid="stChatInputSubmitButton"]:not(:disabled):hover { background: var(--accent-hover); }
 [data-testid="stChatInputSubmitButton"]:disabled { background: var(--fill-hover); color: var(--text-3); }
 
 /* ------------------------------------------------------------------ barra lateral */

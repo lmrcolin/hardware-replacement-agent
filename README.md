@@ -94,8 +94,8 @@ En Databricks: Query History del warehouse, peticiones del serving endpoint de L
 `emerson-vs` y `system.billing.usage`.
 
 **Interfaz.** Encabezado con Nueva conversación y Ajustes (modelo de lenguaje, fuente de datos, voz, detalles
-técnicos); inicio con el catálogo de piezas a reemplazar (filtro por estado y búsqueda); modo claro y oscuro según
-el sistema. Diseño en `app/static/design.css` (tokens) y `.streamlit/config.toml`. La barra lateral guarda
+técnicos); inicio con el catálogo de piezas a reemplazar (filtro por estado y búsqueda); tema claro con el azul rey
+de Emerson. Diseño en `app/static/design.css` (tokens) y `.streamlit/config.toml`. La barra lateral guarda
 **Recientes** y **Tendencias** (solo part numbers; últimos 7 días, en `.cache/advisor/searches.jsonl`, ignorado por
 git; `ADVISOR_SEARCH_LOG` lo cambia).
 

@@ -197,3 +197,65 @@ def test_agent_degrades_when_semantic_search_is_down(built: BuiltArtifacts) -> N
     resp = agent.answer(CustomerQuery(text=OFFICIAL))
     assert [r.product.part_number for r in resp.recommendations] == ["MCX75310AAS-NEAT", "BCM57508"]
     assert any("solo BM25" in w for w in resp.warnings)
+
+
+class EqualityNLU(TemplateClient):
+    """An LLM that reads '100 Gigabit' as *exactly* 100 Gb/s (seen with Llama 3.3 on FMAPI)."""
+
+    name = "eq-llm"
+
+    def complete_json[T: BaseModel](self, prompt: str, schema: type[T]) -> T:
+        parsed = super().complete_json(prompt, schema)
+        reqs = [
+            r.model_copy(update={"operator": Operator.EQ}) if r.key == "port_speed" else r
+            for r in parsed.requirements  # type: ignore[attr-defined]
+        ]
+        return parsed.model_copy(update={"requirements": reqs})
+
+
+@pytest.mark.safety
+def test_numeric_capability_eq_from_llm_is_read_as_minimum(built: BuiltArtifacts) -> None:
+    resp = make_agent(built, EqualityNLU()).answer(CustomerQuery(text=OFFICIAL))
+    assert [r.product.part_number for r in resp.recommendations] == ["MCX75310AAS-NEAT", "BCM57508"]
+    port = next(r for r in resp.parsed_query.requirements if r.key == "port_speed")  # type: ignore[union-attr]
+    assert port.operator is Operator.GTE
+    assert any("port_speed = 100 como ≥ 100" in w for w in resp.warnings)
+
+
+SENSOR_QUERY = "sensor para medir humedad y gases volátiles en interiores"
+
+
+def test_template_understands_spanish_measurands(built: BuiltArtifacts) -> None:
+    resp = make_agent(built).answer(CustomerQuery(text=SENSOR_QUERY))
+    assert [r.product.part_number for r in resp.recommendations] == ["BME680"]
+
+
+class SpanishValuesNLU(TemplateClient):
+    """Returns measurands as Spanish free text in one list (seen with Llama 3.3 on FMAPI)."""
+
+    name = "es-llm"
+
+    def complete_json[T: BaseModel](self, prompt: str, schema: type[T]) -> T:
+        parsed = ParsedQuery(
+            original_text="x",
+            intent="find",
+            category=Category.SENSOR,
+            requirements=[
+                TechnicalRequirement(
+                    key="measurands",
+                    operator=Operator.HAS,
+                    value=["humedad", "gases volátiles", "sabor"],
+                    origin=RequirementOrigin.QUERY,
+                ),
+            ],
+        )
+        return schema.model_validate(parsed.model_dump())
+
+
+@pytest.mark.safety
+def test_llm_values_are_mapped_to_the_registry_vocabulary(built: BuiltArtifacts) -> None:
+    resp = make_agent(built, SpanishValuesNLU()).answer(CustomerQuery(text=SENSOR_QUERY))
+    assert [r.product.part_number for r in resp.recommendations] == ["BME680"]
+    values = sorted(r.value for r in resp.parsed_query.requirements)  # type: ignore[union-attr, type-var]
+    assert values == ["gas", "humidity"]
+    assert any("sabor" in w for w in resp.warnings)  # unknown value dropped, never guessed

@@ -28,6 +28,7 @@ from pathlib import Path
 from advisor.ingestion import discover_documents
 from advisor.kg import save as save_graph
 from advisor.models import Chunk, CompatibilityResult, Product
+from advisor.pipeline import write_manifest
 from advisor.repository import LocalParquetRepository
 from advisor.repository.databricks_sql import TABLES, graph_from_rows
 
@@ -64,6 +65,8 @@ names = {r.document_id: r.filename for r in discover_documents(RAW)}  # citas en
 (OUT / "documents.json").write_text(
     json.dumps(names, indent=1, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8"
 )
+# Procedencia visible en la app ("Fuentes en uso"): estos artefactos salen de Databricks.
+write_manifest(OUT, "databricks", products=len(products), chunks=len(chunks))
 
 # COMMAND ----------
 

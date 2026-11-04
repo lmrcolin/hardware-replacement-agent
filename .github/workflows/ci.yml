@@ -1,0 +1,28 @@
+# make check (ruff + mypy + import-linter + pytest) en cada push y PR a develop/main.
+# Sin secretos: los tests no tocan Databricks (usan fixtures y los PDFs de data/raw).
+name: ci
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Instalar dependencias (uv.lock)
+        run: uv sync --frozen
+      - name: make check
+        run: make check

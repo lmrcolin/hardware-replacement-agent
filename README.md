@@ -49,36 +49,64 @@ make excel            # cost/emerson_advisor_tco.xlsx (TCO con supuestos editabl
 
 Reproducción completa local: `scripts/reproduce_from_scratch.sh --local-only`.
 
+### Todo en Databricks
+
+```bash
+databricks bundle deploy -t dev --profile lmrcolin
+databricks bundle run run_all -t dev --profile lmrcolin   # 00 → 07: bronze, silver, gold, grafo, matriz, AI Search
+make app-databricks PROFILE=lmrcolin    # datos en vivo de emerson_hw.gold.* (SQL warehouse) + AI Search + Llama
+make eval-databricks PROFILE=lmrcolin   # la misma evaluación, todo pasando por Databricks
+```
+
+La barra lateral de la app muestra **Fuentes en uso** (comprobadas, no solo configuradas): origen de los datos,
+estado real de AI Search y cadena de LLM; cada respuesta indica qué motor aportó la evidencia y quién redactó.
+
 Búsqueda híbrida con AI Search (requiere `databricks auth login`):
 `ADVISOR_RETRIEVAL_BACKEND=hybrid ADVISOR_DATABRICKS_PROFILE=<perfil> make app` · comparar motores:
 `uv run python -m evaluation.run_eval --retriever bm25|ai_search|hybrid`.
 
 ## Despliegue en Databricks
 
+Requisitos: Databricks CLI autenticada (`databricks auth login`), `uv` en el PATH (el deploy construye el wheel de
+`advisor`) y permiso `CREATE CATALOG` en el metastore (o un catálogo existente con `--var catalog=<catalogo>`).
+
 ```bash
-databricks auth login --host https://<tu-workspace>.cloud.databricks.com
+databricks auth login --host https://<tu-workspace>.cloud.databricks.com --profile <perfil>
 databricks bundle validate
-databricks bundle deploy -t dev
-databricks bundle run run_all -t dev
+databricks bundle deploy -t dev        # construye dist/*.whl con uv y sincroniza el repo
+databricks bundle run run_all -t dev   # ~5 min (+~20 min la primera vez que se provisiona AI Search)
 ```
 
-El job `run_all` ejecuta:
+El job `run_all` corre en serverless (02–07 en el entorno versión 4, Python 3.12) y es idempotente:
 
-1. `00_setup` — crea `emerson_hw` con esquemas `bronze`/`silver`/`gold` y el volumen `bronze.raw_files`,
-   y copia los 33 PDFs al volumen.
-2. `01_parse` — parsea los PDFs con `ai_parse_document` a `emerson_hw.bronze.documents_parsed`.
+| Tarea | Qué hace | Salida |
+|---|---|---|
+| `00_setup` | catálogo, esquemas, volúmenes; copia los 33 PDFs y el wheel + `config/*.yaml` | `bronze.raw_files`, `bronze.libs` |
+| `01_parse` | `ai_parse_document` (no re-parsea si ya hay 33; `force=true` para rehacer) | `bronze.documents_parsed` |
+| `02_extract_enrich` | catálogo (capa de texto, ADR-012) + specs + cruce; falla si el cruce no es seguro | `silver.commercial`, `silver.products`, `silver.product_specifications`, `gold.products` |
+| `03_chunk_index` | chunks por sección, Change Data Feed | `gold.document_chunks` |
+| `04_build_kg` | grafo de conocimiento | `gold.kg_nodes`, `gold.kg_edges` |
+| `05_compat_matrix` | piezas no ACTIVE contra su categoría | `gold.compat_matrix` |
+| `06_export_artifacts` | mismos archivos que `make pipeline-local` | `/Volumes/<catalog>/gold/artifacts` |
+| `07_ai_search` | crea (si falta) o re-sincroniza el endpoint `emerson-vs` y el índice Delta Sync; `ai_search=false` la omite | `gold.document_chunks_index` |
 
-Los notebooks `02–06` (extracción, chunks, grafo, matriz de compatibilidad, export) están como esqueletos y se
-añadirán al job a medida que se implementen.
+Comprobación (la hace `scripts/reproduce_from_scratch.sh`): `bronze.documents_parsed` 33 · `silver.commercial` 32
+(ACTIVE 21 · DISCONTINUED 6 · EOL 2 · NRND 3) · `silver.product_specifications` 272 · `gold.products` 32 ·
+`gold.document_chunks` 126 · `gold.compat_matrix` 30 · `gold.kg_nodes` 501 · `gold.kg_edges` 586.
+Esquemas en `docs/DATA_MODEL.md`; capacidades probadas en `docs/FEATURE_MATRIX.md`.
 
-Comprobación:
+Usar Databricks desde local:
 
-```sql
-SELECT count(*) FROM emerson_hw.bronze.documents_parsed;  -- 33
-```
+- Artefactos del job: `scripts/reproduce_from_scratch.sh --pull-artifacts` (o
+  `databricks fs cp -r dbfs:/Volumes/emerson_hw/gold/artifacts ./artifacts`).
+- Leer las tablas `gold` directamente: `ADVISOR_REPOSITORY_BACKEND=databricks_sql
+  ADVISOR_DATABRICKS_WAREHOUSE_ID=<id> ADVISOR_DATABRICKS_PROFILE=<perfil>` (`DatabricksSQLRepository`).
 
-Si tu cuenta no permite crear catálogos, usa uno existente:
-`databricks bundle deploy -t dev --var catalog=<catalogo>`.
+Notas de Free Edition: importar código o leer binarios del repo por FUSE `/Workspace` falla en serverless (por eso el
+wheel va en el volumen `bronze.libs`); solo se permite un endpoint de AI Search; los usuarios necesitan `GRANT` sobre
+`emerson_hw` para leer las tablas. Para que cualquiera pueda correr `run_all`, el dueño del índice debe dar
+`GRANT ALL PRIVILEGES ON TABLE emerson_hw.gold.document_chunks_index TO account users` y `CAN_MANAGE` al grupo
+`users` sobre el endpoint `emerson-vs` (si no, `07_ai_search` falla para quien no es dueño).
 
 Reproducción completa desde un clon limpio: `scripts/reproduce_from_scratch.sh`.
 

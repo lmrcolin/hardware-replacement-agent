@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Literal
 
+from advisor.compatibility.engine import default_registry
+from advisor.extraction.registry import fold
 from advisor.extraction.values import parse_number
 from advisor.models import (
     Category,
@@ -71,6 +73,27 @@ def detect_category(text: str) -> Category | None:
     return None
 
 
+def _keyword_requirements(text: str, category: Category) -> list[TechnicalRequirement]:
+    """HAS requirements for registry keywords (and their es/en synonyms) mentioned in the query."""
+    folded = fold(text)
+    found: list[TechnicalRequirement] = []
+    for key, definition in default_registry().for_category(category).items():
+        for keyword, phrases in definition.phrases().items():
+            if keyword.isupper() and len(keyword) <= 4:  # CAN/TLS/GRE: acronym as written ("can")
+                pattern = rf"(?<![A-Za-z]){re.escape(keyword)}(?![A-Za-z])"
+                hit = re.search(pattern, text) is not None
+            else:
+                hit = any(
+                    re.search(rf"(?<![a-z0-9]){re.escape(p)}(?![a-z0-9])", folded) for p in phrases
+                )
+            if hit:
+                found.append(
+                    TechnicalRequirement(key=key, operator=Operator.HAS, value=keyword,
+                                         priority=Priority.MUST, origin=RequirementOrigin.QUERY)
+                )  # fmt: skip
+    return found
+
+
 def _requirements(text: str, category: Category | None) -> list[TechnicalRequirement]:
     lowered = text.lower()
     found: list[TechnicalRequirement] = []
@@ -102,6 +125,11 @@ def _requirements(text: str, category: Category | None) -> list[TechnicalRequire
                 origin=RequirementOrigin.QUERY,
             )
         )
+    if category is not None:
+        for req in _keyword_requirements(text, category):
+            if (req.key, str(req.value)) not in seen:
+                seen.add((req.key, str(req.value)))
+                found.append(req)
     return found
 
 

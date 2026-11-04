@@ -65,6 +65,7 @@ def deletion_in_progress(exc: DatabricksError) -> bool:
 
 # COMMAND ----------
 
+
 # 1. Endpoint. Borrar un endpoint es asíncrono: un rato después de que get_endpoint deja de
 # encontrarlo, el nombre sigue reservado y create_endpoint responde AlreadyExists. Se reintenta.
 def endpoint_exists_or_created() -> bool:
@@ -151,6 +152,12 @@ def index_exists_or_created() -> bool:
 
 wait(f"crear índice {INDEX}", index_exists_or_created, INDEX_TIMEOUT_S)
 
+# Un índice nuevo no hereda permisos: solo su creador (dueño) podría sincronizarlo y el run_all de
+# otra persona fallaría. El creador da acceso al equipo en cuanto lo crea (idempotente).
+if created:
+    spark.sql(f"GRANT ALL PRIVILEGES ON TABLE {INDEX} TO `account users`")
+    print(f"permisos: ALL PRIVILEGES sobre {INDEX} para account users")
+
 # create_index devuelve CreateVectorIndexResponse (sin endpoint_name/spec): se relee siempre.
 index = ws.vector_search_indexes.get_index(INDEX)
 spec = index.delta_sync_index_spec
@@ -167,9 +174,24 @@ if mismatch:
     raise RuntimeError(f"{INDEX} existe con otra especificación (actual, esperado): {mismatch}")
 
 started_ms = int(time.time() * 1000) - 60_000  # margen por desfase de reloj
-if not created:
-    ws.vector_search_indexes.sync_index(INDEX)
+
+
+def sync_started() -> bool:
+    """Si otra ejecución (otro miembro del equipo) está sincronizando, la API responde
+    "not ready to sync" (pipeline INITIALIZING/RUNNING): se espera y se reintenta."""
+    try:
+        ws.vector_search_indexes.sync_index(INDEX)
+    except DatabricksError as exc:
+        if "not ready to sync" not in str(exc).lower():
+            raise
+        print(f"{time.strftime('%X')} sincronización en curso de otra ejecución; reintento")
+        return False
     print(f"sync lanzado para {INDEX}")
+    return True
+
+
+if not created:
+    wait(f"lanzar sync de {INDEX}", sync_started, INDEX_TIMEOUT_S)
 
 
 def update_done() -> bool:

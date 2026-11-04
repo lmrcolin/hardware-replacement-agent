@@ -35,7 +35,9 @@ def build_nlu_prompt(text: str, allowed_keys: dict[str, list[str]]) -> str:
         "- category: una de CPU, DAQ, FPGA, GPU, Memory, Microcontroller, Network, Power, "
         "Sensor, Storage, o null.\n"
         f"- requirements: solo con estas claves por categoría (clave: unidad): {keys}. "
-        'Operadores GTE, LTE, EQ, IN, HAS. Usa HAS con value "*" si piden la capacidad sin '
+        "Operadores GTE, LTE, EQ, IN, HAS. Para cifras de capacidad (velocidad, memoria, "
+        "canales, resolución…) usa GTE (al menos), nunca EQ. "
+        'Usa HAS con value "*" si piden la capacidad sin '
         "detalle (p. ej. 'soporte RDMA'). origin = QUERY. Usa solo valores que aparezcan "
         "literalmente en la consulta; nunca inventes cifras.\n"
         "- needs_clarification = true (con clarification_question) si no hay part number ni "

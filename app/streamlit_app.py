@@ -1,20 +1,53 @@
-"""Streamlit UI: chat over the real AdvisorAgent (artifacts or in-memory build); mock selectable."""
+"""Streamlit UI: chat widget for the replacement agent (real AdvisorAgent or mock).
+
+Widget pattern: header with avatar, name, online status and settings menu; bot and customer
+bubbles; quick-reply buttons; "was this helpful?" rating; input at the bottom; minimize button.
+Each answer shows what the agent did (its trace, explained) and the structured result behind it.
+The sidebar keeps the search history and the most searched topics (components/history.py).
+When the agent asks for clarification, the customer's reply is combined with the previous
+question before it is sent, because the agent itself is stateless per query.
+"""
 
 from __future__ import annotations
 
 import sys
+import uuid
+from dataclasses import dataclass, field
+from html import escape
 from pathlib import Path
 
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from components.render import response_view
+from components.history import (
+    OUTCOME_LABEL,
+    SearchLog,
+    recent,
+    satisfaction,
+    search_record,
+    trending,
+)
+from components.images import image_html
+from components.render import (
+    clarification_options,
+    parts_to_replace,
+    reasoning,
+    reasoning_view,
+    response_view,
+)
+from components.theme import CSS
 from mock_agent import MockAdvisorAgent
 
-from advisor.agent import Advisor
-from advisor.models import CustomerQuery
-from advisor.pipeline import BuiltArtifacts, build_agent, load_or_build
+from advisor.agent import Advisor, AdvisorAgent
+from advisor.models import CommercialStatus, CustomerQuery, RecommendationResponse
+from advisor.pipeline import (
+    BuiltArtifacts,
+    build_agent,
+    evidence_sources,
+    load_or_build,
+    retrieval_status,
+)
 
 REAL, MOCK = "Real (catálogo + datasheets)", "Simulado (fixtures)"
 EXAMPLES = {
@@ -28,6 +61,17 @@ EXAMPLES = {
     "Part number con errata": "Reemplazo para la E81O-CQDA2",
     "Consulta vaga": "Busco un microcontrolador barato",
 }
+ARROW = {"up": "↑", "down": "↓", "flat": "→"}
+
+
+@dataclass
+class Turn:
+    shown: str  # what the customer typed or clicked
+    sent: str  # what was sent to the agent (shown + context when answering a clarification)
+    response: RecommendationResponse
+    trace: list[str]
+    found_by: str | None
+    id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
 
 
 @st.cache_resource(show_spinner="Cargando catálogo, datasheets y grafo…")
@@ -40,41 +84,236 @@ def get_agent(kind: str) -> Advisor:
     return MockAdvisorAgent() if kind == MOCK else build_agent(artifacts=get_artifacts())
 
 
-st.set_page_config(page_title="Emerson Replacement Advisor", layout="wide")
-st.title("Emerson Replacement Advisor")
-st.caption(
-    "Sustitutos para piezas descontinuadas · el catálogo es la fuente de verdad · "
-    "compatibilidad decidida por reglas deterministas con evidencia"
-)
-
-history = st.session_state.setdefault("history", [])
-
-with st.sidebar:
-    kind = st.radio("Agente", [REAL, MOCK])
-    st.markdown("**Ejemplos**")
-    for label, text in EXAMPLES.items():
-        if st.button(label, use_container_width=True):
-            st.session_state["pending"] = text
-    if st.button("Limpiar conversación", type="secondary"):
-        history.clear()
+@st.cache_resource(show_spinner="Comprobando la búsqueda documental…")
+def get_retrieval_status(kind: str) -> str:
     agent = get_agent(kind)
-    trace = getattr(agent, "last_trace", [])
-    if trace:
-        st.markdown("**Pasos del último análisis**")
-        st.caption(" → ".join(step.value for step in trace))
+    return retrieval_status(agent.retriever) if isinstance(agent, AdvisorAgent) else "fixtures"
 
+
+st.set_page_config(page_title="Emerson Replacement Advisor · Agente", page_icon="🤖", layout="wide")
+st.html(CSS)
+state = st.session_state
+turns: list[Turn] = state.setdefault("turns", [])
+search_log = SearchLog()
+
+
+def ask(text: str | None = None, *, follow_up: bool = True) -> None:
+    """Callback: queue a message. Answers to a clarification carry the previous question."""
+    text = (text if text is not None else state.get("chat") or "").strip()
+    if not text:
+        return
+    sent = text
+    if follow_up and turns and turns[-1].response.clarification_question:
+        sent = f"{turns[-1].sent} {text}"
+    state["pending"] = (text, sent)
+    state["minimized"] = False
+
+
+def new_conversation() -> None:
+    turns.clear()
+    st.query_params.clear()
+
+
+def toggle_widget() -> None:
+    state["minimized"] = not state.get("minimized", False)
+
+
+def rate(turn_id: str) -> None:
+    value = state.get(f"fb-{turn_id}")
+    if value is not None:
+        search_log.rate(turn_id, useful=value == 1)
+
+
+# Only on a fresh session: later reruns keep ?k= in the URL and must not re-send it.
+if "k" in st.query_params and not state.get("url_used") and not turns:
+    ask(st.query_params["k"], follow_up=False)
+state["url_used"] = True
+
+# ---------------------------------------------------------------- sidebar: history and trends
+history_rows = search_log.read()
+with st.sidebar:
+    st.markdown("### Historial de búsqueda")
+    trends = trending(history_rows)
+    st.markdown("**Más buscadas · últimos 7 días**")
+    if trends:
+        top = trends[0].total
+        for i, trend in enumerate(trends):
+            with st.container(key=f"trend-{i}"):
+                st.button(
+                    f"{trend.topic}",
+                    key=f"trend-ask-{i}",
+                    on_click=ask,
+                    args=(trend.example,),
+                    kwargs={"follow_up": False},
+                    type="tertiary",
+                )
+                st.markdown(
+                    f'<div class="trend"><div class="bar" style="width:{trend.total / top:.0%}">'
+                    f"</div><span>{trend.total} {'búsqueda' if trend.total == 1 else 'búsquedas'} "
+                    f'<b class="{trend.direction}">{ARROW[trend.direction]}</b> '
+                    f"vs. 7 días previos ({trend.previous})</span></div>",
+                    unsafe_allow_html=True,
+                )
+    else:
+        st.caption("Aún no hay búsquedas registradas.")
+    st.markdown("**Búsquedas recientes**")
+    latest = recent(history_rows)
+    if latest:
+        for i, record in enumerate(latest):
+            label = record["text"] if len(record["text"]) <= 46 else record["text"][:45] + "…"
+            st.button(
+                label,
+                key=f"recent-{i}",
+                on_click=ask,
+                args=(record["sent"] or record["text"],),
+                kwargs={"follow_up": False},
+                type="tertiary",
+                help=f"{record['ts'][:16].replace('T', ' ')} UTC · "
+                f"{OUTCOME_LABEL.get(record.get('outcome', ''), '')}",
+            )
+    else:
+        st.caption("Tus búsquedas aparecerán aquí.")
+    useful, rated = satisfaction(history_rows)
+    if rated:
+        st.caption(f"Respuestas valoradas como útiles: {useful} de {rated}")
+
+# ---------------------------------------------------------------- widget header
+minimized = state.get("minimized", False)
+kind = state.get("agent", REAL)
+with st.container(key="widget-head"):
+    who, menu, fold = st.columns([8, 0.7, 0.7], vertical_alignment="center")
+    online = "En línea" if kind == REAL else "Modo simulado"
+    who.markdown(
+        '<div class="head-id"><div class="avatar">AI</div><div><small>Chat con</small><br>'
+        "<b>Agente de reemplazo Emerson</b></div></div>"
+        f'<div class="head-status"><span class="dot"></span>{online} · responde en segundos con '
+        "evidencia de los datasheets</div>",
+        unsafe_allow_html=True,
+    )
+    with menu.popover("", icon=":material/more_vert:", help="Ajustes del agente"):
+        kind = st.radio("Fuente de datos", [REAL, MOCK], key="agent")
+        st.button(
+            "Nueva conversación", key="new-chat", on_click=new_conversation,
+            icon=":material/add_comment:",
+        )  # fmt: skip
+        agent = get_agent(kind)
+        st.markdown("**Herramientas del agente**")
+        if isinstance(agent, AdvisorAgent):
+            artifacts = get_artifacts()
+            chain = " → ".join(c.name for c in agent.llm_chain)
+            tools = [
+                ("Catálogo comercial", f"{len(artifacts.catalog)} piezas · fuente de verdad"),
+                ("Grafo de conocimiento", f"{artifacts.graph.number_of_nodes()} nodos"),
+                ("Búsqueda documental", get_retrieval_status(kind)),
+                ("Motor de compatibilidad", "reglas deterministas · sin LLM"),
+                ("Modelo de lenguaje", f"{chain} · solo interpreta y redacta"),
+                ("Datos", artifacts.source),
+            ]
+        else:
+            tools = [("Datos", "fixtures sintéticos (agente simulado)")]
+        st.markdown(
+            "".join(
+                f'<div class="tool"><b>{escape(name)}</b><span>{escape(value)}</span></div>'
+                for name, value in tools
+            ),
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Cómo decide: estado, precio y stock salen solo del catálogo; la compatibilidad la "
+            "deciden reglas deterministas con evidencia; solo recomienda piezas ACTIVE; el LLM "
+            "interpreta y redacta, y sus cifras se verifican."
+        )
+    fold.button(
+        "", key="minimize", on_click=toggle_widget,
+        icon=":material/expand_more:" if not minimized else ":material/expand_less:",
+        help="Minimizar el chat" if not minimized else "Abrir el chat",
+    )  # fmt: skip
+
+agent = get_agent(kind)
 names = get_artifacts().document_names if kind == REAL else {}
-prompt = st.chat_input("Describe la pieza a reemplazar o lo que necesitas")
-prompt = prompt or st.session_state.pop("pending", None)
-if prompt:
-    response = agent.answer(CustomerQuery(text=prompt.strip()))
-    history.append((prompt, response))
+known_parts = [p.part_number for p in get_artifacts().products] if kind == REAL else []
 
-if not history:
-    st.info("Escribe una consulta o elige un ejemplo en la barra lateral.")
-for question, response in history:
+# ---------------------------------------------------------------- run the agent
+pending = state.pop("pending", None)
+if pending:
+    shown, sent = pending
+    with st.spinner("El agente está analizando: interpreta, consulta catálogo y grafo, valida…"):
+        response = agent.answer(CustomerQuery(text=sent))
+    trace = [str(step) for step in getattr(agent, "last_trace", [])]
+    found_by = evidence_sources(agent.retriever) if isinstance(agent, AdvisorAgent) else None
+    turn = Turn(shown, sent, response, trace, found_by)
+    turns.append(turn)
+    search_log.append(search_record(turn.id, shown, sent, response, source=kind))
+    st.query_params["k"] = sent
+
+if minimized:
+    st.caption(f"Chat minimizado · {len(turns)} mensaje(s) en esta conversación.")
+    st.stop()
+
+# ---------------------------------------------------------------- conversation
+with st.chat_message("assistant"):
+    st.markdown(
+        "¡Hola! Soy el agente de reemplazo. Dime qué pieza necesitas sustituir (part number) o "
+        "qué requisitos debe cumplir: busco en el catálogo, valido la compatibilidad con reglas "
+        "y te muestro la evidencia. Si me falta un dato, te pregunto."
+    )
+    if not turns:
+        with st.container(key="quick-examples"):
+            for i, (label, text) in enumerate(EXAMPLES.items()):
+                st.button(
+                    label, key=f"ex-{i}", on_click=ask, args=(text,), kwargs={"follow_up": False}
+                )
+        if kind == REAL:
+            risky = parts_to_replace(get_artifacts().products)
+            st.caption(f"O elige una de las {len(risky)} piezas que necesitan reemplazo:")
+            cols = st.columns(5)
+            for i, product in enumerate(risky):
+                assert product.commercial is not None
+                status = product.commercial.status
+                color = "orange" if status is CommercialStatus.NRND else "red"
+                with cols[i % 5], st.container(key=f"part-{product.part_number}"):
+                    st.markdown(
+                        image_html(product, css_class="pimg pimg-mini"), unsafe_allow_html=True
+                    )
+                    st.markdown(f":{color}-badge[{status.value}]")
+                    st.button(
+                        product.part_number,
+                        key=f"pick-{product.part_number}",
+                        on_click=ask,
+                        args=(f"Necesito reemplazar la {product.part_number}",),
+                        kwargs={"follow_up": False},
+                        width="stretch",
+                    )
+
+for i, turn in enumerate(turns):
     with st.chat_message("user"):
-        st.write(question)
+        st.write(turn.shown)
+        if turn.sent != turn.shown:
+            st.caption(f"Enviado al agente con el contexto anterior: “{turn.sent}”")
     with st.chat_message("assistant"):
-        response_view(response, names)
-        st.caption(f"Redacción: {response.llm_provider} · contrato {response.contract_version}")
+        retrieval = get_retrieval_status(kind) if kind == REAL else None
+        steps = reasoning(turn.response, turn.trace, retrieval=retrieval, found_by=turn.found_by)
+        if steps:
+            reasoning_view(steps, turn.response)
+        response_view(turn.response, names, turn=i)
+        options = clarification_options(turn.response.clarification_question, known_parts)
+        if options and i == len(turns) - 1:
+            with st.container(key=f"quick-options-{i}"):
+                for pn in options:
+                    st.button(pn, key=f"opt-{i}-{pn}", on_click=ask, args=(pn,))
+        with st.container(key=f"rating-{i}"):
+            left, right = st.columns([3, 1], vertical_alignment="center")
+            left.caption(
+                f"Redacción: {turn.response.llm_provider} · contrato "
+                f"{turn.response.contract_version}"
+            )
+            with right:
+                st.caption("¿Te fue útil?")
+                st.feedback("thumbs", key=f"fb-{turn.id}", on_change=rate, args=(turn.id,))
+
+placeholder = (
+    "Responde a la pregunta del agente…"
+    if turns and turns[-1].response.clarification_question
+    else "Escribe tu mensaje…"
+)
+st.chat_input(placeholder, key="chat", on_submit=ask)

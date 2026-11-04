@@ -10,6 +10,7 @@
 # compare (compatibility engine): gte | lte | eq | interface | has_all | intersects | contains (ranges)
 #   defaults: number→gte, range→contains, list→has_all, string/boolean→eq
 # derive: false → the original's value is informative only (not turned into a requirement)
+# negotiable: false → the agent never offers to drop it when negotiating (ISA, function...)
 # upgrade_condition: when the candidate exceeds the original on this key, compatibility holds only
 #   with this condition (R-UPGRADE). Placeholders: {original} {candidate} {unit}
 version: "1.1.0"
@@ -30,10 +31,10 @@ categories:
     l3_cache:       {unit: MB, type: number, aliases: [l3, l3 cache]}
     memory_channels: {unit: count, type: number, aliases: [ddr5]}
     pcie_lanes:     {unit: count, type: number, aliases: [pcie5, pcie 5.0]}
-    tdp:            {unit: W, type: number, compare: lte, aliases: [tdp]}
+    tdp:            {unit: W, type: number, compare: lte, aliases: [tdp], description: "consumo de potencia (TDP)"}
     socket:         {type: string, critical: true, patterns: ['Socket (\w+)']}
     architecture:   {type: string, critical: true, aliases: [arch], patterns: ['(Armv[\d.]+-?A)', '(Zen \d)'],
-                     description: "ISA/microarchitecture: ARM vs x86 is never a drop-in replacement"}
+                     description: "ISA/microarchitecture: ARM vs x86 is never a drop-in replacement", negotiable: false}
 
   DAQ:
     analog_inputs:  {unit: count, type: number, critical: true, aliases: [channels], description: "canales / entradas analógicas", patterns: ['(\d+) single-ended']}
@@ -63,13 +64,13 @@ categories:
     fp64:             {unit: TFLOPS, type: number, aliases: [fp64, peak fp64]}
     fp32:             {unit: TFLOPS, type: number, aliases: [fp32, peak fp32]}
     cuda_cores:       {unit: count, type: number, aliases: [cuda, cuda cores]}
-    tdp:              {unit: W, type: number, compare: lte, aliases: [tdp]}
+    tdp:              {unit: W, type: number, compare: lte, aliases: [tdp], description: "consumo de potencia (TDP)"}
     host_interface:   {type: string, compare: interface, aliases: [pcie, host interface], patterns: ['(PCIe Gen\d x\d+)']}
     form_factor:      {type: list, critical: true, compare: intersects, aliases: [form factor, form factors]}
     interconnect:     {type: list, keywords: [NVLink, NVSwitch, Infinity Fabric]}
 
   Memory:
-    memory_type:  {type: string, critical: true, patterns: ['\b(LPDDR5X|DDR5|HBM3)\b']}
+    memory_type:  {type: string, critical: true, patterns: ['\b(LPDDR5X|DDR5|HBM3)\b'], negotiable: false}
     capacity:     {unit: GB, type: number, critical: true, aliases: [capacity, density]}
     data_rate:    {unit: MT/s, type: number, aliases: [speed]}
     voltage:      {unit: V, type: number, critical: true, aliases: [voltage, vdd/vddq]}
@@ -100,10 +101,10 @@ categories:
     offloads:       {type: list, keywords: [IPsec, TLS, VXLAN, GENEVE, NVGRE, GRE, OVS, NVMe-oF],
                      synonyms: {IPsec: [ipsec offload, cifrado ipsec], TLS: [ssl, tls offload], NVMe-oF: [nvme over fabrics]}}
     connector:      {type: string, patterns: ['\b(QSFP\d+)\b']}
-    tdp:            {unit: W, type: number, compare: lte, aliases: [tdp]}
+    tdp:            {unit: W, type: number, compare: lte, aliases: [tdp], description: "consumo de potencia (TDP)"}
 
   Power:
-    subcategory:         {type: string, critical: true, description: "Function (VRM, USB PD controller...) from the Category header"}
+    subcategory:         {type: string, critical: true, description: "Function (VRM, USB PD controller...) from the Category header", negotiable: false}
     output_current:      {unit: A, type: number, critical: true, aliases: [current, continuous output current]}
     input_voltage:       {unit: V, type: range, critical: true, aliases: [vin, input voltage]}
     output_voltage:      {unit: V, type: range, critical: true, aliases: [vout, output voltage]}
@@ -120,7 +121,7 @@ categories:
                  synonyms: {gas: [gases, gases volatiles, voc, compuestos organicos volatiles, calidad del aire],
                             pressure: [presion, presion barometrica, barometro], humidity: [humedad, humedad relativa],
                             temperature: [temperatura], gyroscope: [giroscopio, giroscopo, gyro, rotacion],
-                            accelerometer: [acelerometro, aceleracion, accel]}}
+                            accelerometer: [acelerometro, aceleracion, accel]}, negotiable: false}
     interface:  {type: list, critical: true, compare: intersects, keywords: [I2C, SPI]}
     dof:        {type: string, aliases: [dof]}
     package:    {type: string, patterns: ['\b(LGA|QFN)\b']}

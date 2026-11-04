@@ -19,11 +19,33 @@ from advisor.llm.base import (
 log = logging.getLogger(__name__)
 
 
+def _databricks_configured(profile: str | None) -> bool:
+    """A named profile, or the CLI's default one / DATABRICKS_* variables, resolves to a host.
+    Without it the FMAPI client would fail on every call, so it is left out of the chain."""
+    try:
+        from databricks.sdk.core import Config
+
+        return bool(Config(profile=profile).host)
+    except Exception:  # SDK raises several error types for "not configured"
+        return False
+
+
+def _wants_databricks(settings: Settings) -> bool:
+    """Llama is used with an explicit profile, or with the CLI's default one when the run is
+    already on Databricks (Delta tables or AI Search). A plain local run stays on templates."""
+    if settings.databricks.profile:
+        return True
+    on_databricks = settings.repository_backend == "databricks_sql" or (
+        settings.retrieval.backend in ("ai_search", "hybrid")
+    )
+    return on_databricks and _databricks_configured(None)
+
+
 def build_llm_chain(settings: Settings) -> list[LLMClient]:
     """Configured providers that can actually answer; TemplateClient is always appended."""
     chain: list[LLMClient] = []
     for name in settings.llm.providers:
-        if name == "databricks" and settings.databricks.profile:
+        if name == "databricks" and _wants_databricks(settings):
             chain.append(
                 DatabricksFMAPIClient(
                     settings.llm.databricks_endpoint,

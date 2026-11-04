@@ -40,6 +40,9 @@ class SpecDefinition(BaseModel):
     compare: Compare | None = None
     derive: bool = True
     upgrade_condition: str | None = None
+    # false: defines what the product is (ISA, function, what a sensor measures); the agent never
+    # offers to drop it when negotiating requirements (ADR-014).
+    negotiable: bool = True
 
     @property
     def comparison(self) -> Compare:

@@ -309,3 +309,94 @@ def test_truncated_part_number_is_suggested_not_assumed(built: BuiltArtifacts) -
     resp = ask(built, "Reemplazo para WUS4C6464")
     assert resp.original is None
     assert resp.clarification_question and "WUS4C6464DSP3X5" in resp.clarification_question
+
+
+# ---------------------------------------------------------------- agent with tools + memory (ADR-014)
+
+
+def converse(built: BuiltArtifacts, *texts: str, agent: AdvisorAgent | None = None):  # type: ignore[no-untyped-def]
+    agent = agent or make_agent(built)
+    context, responses = None, []
+    for text in texts:
+        resp = agent.answer(CustomerQuery(text=text, context=context))
+        context = resp.context
+        responses.append(resp)
+    return responses
+
+
+def test_follow_up_remembers_the_part_and_orders_by_price(built: BuiltArtifacts) -> None:
+    first, cheap = converse(built, OFFICIAL, "¿y la más barata?")
+    assert first.recommendations[0].product.part_number == "MCX75310AAS-NEAT"
+    assert cheap.original is not None and cheap.original.part_number == "E810-CQDA2"
+    assert [r.product.part_number for r in cheap.recommendations] == [
+        "BCM57508",
+        "MCX75310AAS-NEAT",
+    ]
+
+
+def test_follow_up_replaces_a_remembered_figure(built: BuiltArtifacts) -> None:
+    first, second = converse(
+        built, "Necesito una NIC de 800 Gb con RDMA", "ya no necesito 800, con 200 me basta"
+    )
+    assert first.recommendations == [] and second.recommendations
+    speed = [r for r in second.parsed_query.requirements if r.key == "port_speed"]  # type: ignore[union-attr]
+    assert [r.value for r in speed] == [200]
+
+
+def test_no_substitute_negotiates_one_requirement(built: BuiltArtifacts) -> None:
+    resp = ask(built, "Necesito reemplazar la A100")
+    assert resp.recommendations == []  # SXM5 is still not a drop-in for SXM4
+    assert [(r.dropped.key, r.option.product.part_number) for r in resp.relaxations] == [
+        ("form_factor", "H100-SXM5")
+    ]
+    assert "prescindir de un requisito" in resp.message
+    assert [c.tool for c in resp.tool_calls] == [
+        "lookup_part", "find_substitutes", "relax_requirements", "finish",
+    ]  # fmt: skip
+
+
+def test_technical_question_is_answered_from_specs_with_citations(built: BuiltArtifacts) -> None:
+    resp = ask(built, "¿Cuánto consume la H100?")
+    assert "tdp: 700 W" in resp.message and resp.citations
+    assert "Price" not in resp.message  # datasheet prices never leak: the catalog is the truth
+    yes = ask(built, "¿la MCX soporta RoCE v2?")
+    assert "MCX75310AAS-NEAT sí declara RoCE v2" in yes.message
+
+
+def test_compare_uses_the_conversation_reference(built: BuiltArtifacts) -> None:
+    _, compared = converse(built, OFFICIAL, "compárala con la BCM57508")
+    assert "Como sustituto de MCX75310AAS-NEAT, BCM57508 es compatible con condiciones" in (
+        compared.message
+    )
+
+
+def test_clarification_asks_the_most_informative_question(built: BuiltArtifacts) -> None:
+    question, answer = converse(built, "Busco una tarjeta de red", "400 Gb/s")
+    assert question.clarification_options == ["200 Gb/s", "400 Gb/s"]
+    assert [r.product.part_number for r in answer.recommendations] == ["MCX75310AAS-NEAT"]
+
+
+class BadPlanner(LLMClient):
+    """Proposes a harmful plan (ask the customer, skip the search); NLU/NLG via templates."""
+
+    name = "fake-llm"
+
+    def complete_json(self, prompt: str, schema: type[BaseModel]) -> BaseModel:  # type: ignore[override]
+        if schema.__name__ == "AgentPlan":
+            return schema.model_validate(
+                {"thought": "preguntar", "steps": [{"tool": "ask_customer"}, {"tool": "finish"}]}
+            )
+        return TemplateClient().complete_json(prompt, schema)
+
+    def generate(self, prompt: str) -> str:
+        return TemplateClient().generate(prompt)
+
+
+def test_guard_corrects_an_invalid_llm_plan(built: BuiltArtifacts) -> None:
+    resp = make_agent(built, BadPlanner()).answer(CustomerQuery(text=OFFICIAL))
+    assert [r.product.part_number for r in resp.recommendations] == [
+        "MCX75310AAS-NEAT", "BCM57508",
+    ]  # fmt: skip
+    assert resp.clarification_question is None
+    assert any("corrige a fake-llm" in c.decided_by for c in resp.tool_calls)
+    assert resp.tool_calls[0].thought == "preguntar"

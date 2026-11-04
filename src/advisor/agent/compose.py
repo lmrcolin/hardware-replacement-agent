@@ -12,6 +12,7 @@ from advisor.models import (
     CompatibilityResult,
     Product,
     Recommendation,
+    Relaxation,
     RuleOutcome,
     Severity,
 )
@@ -95,6 +96,7 @@ def draft_message(
     blocked_successors: Mapping[str, CompatibilityResult],
     unverified: Sequence[Recommendation] = (),
     rejected: Sequence[tuple[str, str, Sequence[str]]] = (),
+    relaxations: Sequence[Relaxation] = (),
 ) -> str:
     """Deterministic answer. ``rejected`` = (part number, description, reasons) of discarded
     candidates, shown when nothing is recommended so the customer sees why."""
@@ -130,6 +132,15 @@ def draft_message(
             f"- {part} — {description}: {'; '.join(reasons)}."
             for part, description, reasons in rejected
         )
+    if relaxations:
+        lines.append(
+            "Alternativas si puedes prescindir de un requisito (no cumplen todo lo pedido):"
+        )
+        for relaxation in relaxations:
+            req, rec = relaxation.dropped, relaxation.option
+            unit = "" if not req.unit or req.unit == "count" else f" {req.unit}"
+            what = f"{req.key} = {req.value}{unit}" if req.value != "*" else req.key
+            lines.append(f"- Sin {what}: " + _recommendation_line(rec).split(". ", 1)[1])
     if risky:
         lines.append("Opciones con riesgo (NRND, sin precio de venta vigente):")
         lines.extend(_recommendation_line(r) for r in risky)

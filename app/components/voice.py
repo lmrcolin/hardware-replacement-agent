@@ -2,7 +2,8 @@
 
 - STT: faster-whisper (https://github.com/SYSTRAN/faster-whisper, MIT) on the CPU, int8.
   Local and free (CLAUDE.md rule 5): the audio never leaves the machine. The model is
-  downloaded once on first use (``ADVISOR_WHISPER_MODEL``, default ``small``). Optional extra:
+  downloaded once and pre-loaded in the background when the app starts, so the first dictation
+  does not block the chat (``ADVISOR_WHISPER_MODEL``, default ``base``). Optional extra:
   ``uv sync --extra voice``; without it the microphone is simply not offered.
 - TTS: the browser's own ``speechSynthesis`` (Spanish voice when available). No dependency, no
   service. It reads only the agent's final message, which the agent already verified.
@@ -15,14 +16,17 @@ import io
 import json
 import os
 import re
+import threading
 import wave
 from collections.abc import Callable, Iterable
 from functools import cache
 from importlib.util import find_spec
 from typing import Any
 
-DEFAULT_MODEL = "small"
+DEFAULT_MODEL = "base"  # ~145 MB, ~1 s per sentence on CPU; "small" is better but ~3x slower
 MODEL_ENV = "ADVISOR_WHISPER_MODEL"
+_warmup: dict[str, str] = {}  # model name -> "loading" | "ready" | "error: ..."
+_lock = threading.Lock()
 
 
 def available() -> bool:
@@ -35,6 +39,33 @@ def _model(name: str) -> Any:
     from faster_whisper import WhisperModel  # optional dependency
 
     return WhisperModel(name, device="cpu", compute_type="int8")
+
+
+def model_name() -> str:
+    return os.environ.get(MODEL_ENV) or DEFAULT_MODEL
+
+
+def warm_up() -> None:
+    """Download/load the model in a background thread (once per process)."""
+    name = model_name()
+    with _lock:
+        if name in _warmup:
+            return
+        _warmup[name] = "loading"
+
+    def load() -> None:
+        try:
+            _model(name)
+            _warmup[name] = "ready"
+        except Exception as exc:  # download or load failure: voice stays off, chat keeps working
+            _warmup[name] = f"error: {str(exc)[:160]}"
+
+    threading.Thread(target=load, name="whisper-warmup", daemon=True).start()
+
+
+def status() -> str:
+    """ "ready", "loading", "error: …" or "off" (not warmed up yet)."""
+    return _warmup.get(model_name(), "off")
 
 
 def vocabulary_prompt(part_numbers: Iterable[str]) -> str:
@@ -66,11 +97,13 @@ def wav_to_float32(audio: bytes) -> Any:
 
 def transcribe(audio: bytes, *, vocabulary: Iterable[str] = ()) -> str:
     """Spanish transcript of a WAV recording (empty string when nothing was said)."""
-    model = _model(os.environ.get(MODEL_ENV) or DEFAULT_MODEL)
+    model = _model(model_name())
     segments, _ = model.transcribe(
         wav_to_float32(audio),
         language="es",
         vad_filter=True,
+        beam_size=1,  # greedy: several times faster on CPU, same quality for short commands
+        condition_on_previous_text=False,
         initial_prompt=vocabulary_prompt(vocabulary) or None,
     )
     return " ".join(s.text.strip() for s in segments).strip()

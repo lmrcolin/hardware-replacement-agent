@@ -38,8 +38,10 @@ from components.render import (
     response_view,
 )
 from components.theme import CSS
-from components.voice import available as voice_available
+from components.voice import available as voice_installed
 from components.voice import message_from, speak_html, transcribe
+from components.voice import status as voice_status
+from components.voice import warm_up as voice_warm_up
 from mock_agent import MockAdvisorAgent
 
 from advisor.agent import Advisor, AdvisorAgent
@@ -97,6 +99,32 @@ def get_retrieval_status(kind: str) -> str:
 st.set_page_config(page_title="Emerson Replacement Advisor · Agente", page_icon="🤖", layout="wide")
 st.html(CSS)
 state = st.session_state
+if voice_installed():
+    voice_warm_up()  # background download/load: the first dictation does not block the chat
+
+
+def voice_available() -> bool:
+    """The microphone is offered only once the speech model is loaded."""
+    return voice_installed() and voice_status() == "ready"
+
+
+def _voice_pending() -> str:
+    if not voice_installed():
+        return "Para hablarle al agente instala la voz: `uv sync --extra voice`."
+    current = voice_status()
+    if current.startswith("error"):
+        return f"Voz no disponible ({current[7:]}); puedes escribir normalmente."
+    return "Voz: preparando el modelo de reconocimiento (solo la primera vez)…"
+
+
+@st.fragment(run_every="3s")
+def _wait_for_voice() -> None:
+    """Re-render once the speech model finishes loading, so the microphone appears by itself."""
+    if voice_installed() and voice_status() == "ready" and not state.get("voice_shown"):
+        state["voice_shown"] = True
+        st.rerun(scope="app")
+
+
 turns: list[Turn] = state.setdefault("turns", [])
 search_log = SearchLog()
 
@@ -247,7 +275,7 @@ with st.container(key="widget-head"):
             "Micrófono en el campo de mensaje: transcripción local con faster-whisper; las "
             "respuestas a preguntas dictadas se leen en voz alta."
             if voice_available()
-            else "Para hablarle al agente instala la voz: `uv sync --extra voice`."
+            else _voice_pending()
         )
         st.caption(
             "Cómo decide: estado, precio y stock salen solo del catálogo; la compatibilidad la "
@@ -364,4 +392,6 @@ placeholder = (
     if turns and turns[-1].response.clarification_question
     else "Escribe tu mensaje…"
 )
+if voice_installed() and not state.get("voice_shown"):
+    _wait_for_voice()
 st.chat_input(placeholder, key="chat", on_submit=ask, accept_audio=voice_available())

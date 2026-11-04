@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
@@ -49,6 +50,7 @@ from advisor.llm import (
 from advisor.llm.rules import explicit_intent
 from advisor.models import (
     Category,
+    ChunkHit,
     CommercialStatus,
     CompatibilityLevel,
     CompatibilityResult,
@@ -78,6 +80,7 @@ CONFIDENT = 0.85  # minimum PartMatch score to act without asking
 SUGGEST = 0.6  # fuzzy matches above this are offered back, never assumed
 AMBIGUITY_GAP = 0.05  # two matches closer than this → ask which one
 MAX_REJECTED = 3  # discarded candidates explained when nothing is recommended
+CACHE_SIZE = 64  # answers kept per agent (repeated demo questions are instant)
 
 # Explicit customer constraints, read deterministically from the query (never by the LLM).
 CHEAP = re.compile(r"barat|econ[oó]mic|cheap|low[- ]cost|menor precio|bajo costo|presupuesto", re.I)
@@ -143,6 +146,7 @@ class _Run:
     answer_lines: list[str] = field(default_factory=list)
     citations: list[Evidence] = field(default_factory=list)
     clarification: Question | None = None
+    prefetch: Future[list[ChunkHit] | RetrievalUnavailableError] | None = None
 
 
 class AdvisorAgent:
@@ -163,6 +167,7 @@ class AdvisorAgent:
         self.llm_chain = list(llm_chain)
         self.registry = registry or default_registry()
         self.last_trace: list[AgentStep] = []
+        self._cache: dict[str, tuple[RecommendationResponse, list[AgentStep]]] = {}
 
     # ------------------------------------------------------------------ steps
 
@@ -313,10 +318,10 @@ class AdvisorAgent:
         pool = {p.part_number for p in self.products.values() if p.category is original.category}
         for c in candidate_neighbors(self.graph, original.part_number, max_candidates=50):
             pool.add(c.part_number)
-        try:
-            hits = self.retriever.search(run.query.text, top_k=8)
-        except RetrievalUnavailableError as exc:
-            hits = []
+        found = run.prefetch.result() if run.prefetch else self._search_documents(run.query.text)
+        hits = found if isinstance(found, list) else []
+        if isinstance(found, RetrievalUnavailableError):
+            exc = found
             run.warnings.append(
                 f"Búsqueda documental no disponible ({exc}); se usa catálogo y grafo."
             )
@@ -342,10 +347,23 @@ class AdvisorAgent:
     # ------------------------------------------------------------------ answer
 
     def answer(self, query: CustomerQuery) -> RecommendationResponse:
-        """NLU → memory → plan (LLM or rules) → deterministic tools → compose → verify."""
+        """NLU → memory → plan (LLM or rules) → deterministic tools → compose → verify.
+
+        The LLM's NLU, the LLM's plan and the document search run in parallel: the plan is made
+        from the deterministic parse, so it does not wait for the LLM's interpretation."""
+        key = query.model_dump_json()
+        if key in self._cache:  # same question in the same conversation state: same answer
+            cached, trace = self._cache[key]
+            self.last_trace = list(trace)
+            return cached.model_copy(deep=True)
         run = _Run(query, context=query.context or ConversationContext())
-        run.parsed = self._remember(self._parse(run), run)
-        queue, planner, thought = self._plan(run)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            planning = pool.submit(self._plan, run.query.text, run.context)
+            run.prefetch = pool.submit(self._search_documents, run.query.text)
+            run.parsed = self._remember(self._parse(run), run)
+            queue, planner, thought = planning.result()
+        if planner != "rules":
+            run.trace.append(AgentStep.PLAN)
         for _ in range(MAX_STEPS + 2):
             state = self._plan_state(run)
             proposed = queue.pop(0) if queue else None
@@ -360,7 +378,17 @@ class AdvisorAgent:
             thought = None
             if action.tool == "finish":
                 break
-        return self._finish(run)
+        response = self._finish(run)
+        if len(self._cache) >= CACHE_SIZE:
+            self._cache.pop(next(iter(self._cache)))
+        self._cache[key] = (response.model_copy(deep=True), list(run.trace))
+        return response
+
+    def _search_documents(self, text: str) -> list[ChunkHit] | RetrievalUnavailableError:
+        try:
+            return self.retriever.search(text, top_k=8)
+        except RetrievalUnavailableError as exc:
+            return exc
 
     # ------------------------------------------------------------------ memory
 
@@ -405,27 +433,28 @@ class AdvisorAgent:
 
     # ------------------------------------------------------------------ planning
 
-    def _plan(self, run: _Run) -> tuple[list[AgentAction], str, str | None]:
-        """The LLM's ordered tool calls; none (rules decide) when only templates are available."""
+    def _plan(
+        self, text: str, context: ConversationContext
+    ) -> tuple[list[AgentAction], str, str | None]:
+        """The LLM's ordered tool calls; none (rules decide) when only templates are available.
+        Runs in a worker thread: it reads only the query and the memory, never the run."""
         if all(c.name == "template" for c in self.llm_chain):
             return [], "rules", None
-        parsed = run.parsed
-        assert parsed is not None
-        reqs = "; ".join(f"{r.key} {r.operator.value} {r.value}" for r in parsed.requirements)
+        quick = parse_query(text, category_hint=context.category)
+        reqs = "; ".join(f"{r.key} {r.operator.value} {r.value}" for r in quick.requirements)
         situation = (
-            f"Cliente: {run.query.text}\n"
-            f"Interpretación: intención={parsed.intent}; categoría={parsed.category}; "
-            f"part numbers={', '.join(parsed.part_numbers) or 'ninguno'}; "
+            f"Cliente: {text}\n"
+            f"Lectura rápida: intención={quick.intent}; categoría={quick.category}; "
+            f"part numbers={', '.join(quick.part_numbers) or 'ninguno'}; "
             f"requisitos={reqs or 'ninguno'}\n"
-            f"Memoria: pieza={run.context.original_part_number or 'ninguna'}; "
-            f"recomendados antes={', '.join(run.context.recommended) or 'ninguno'}"
+            f"Memoria: pieza={context.original_part_number or 'ninguna'}; "
+            f"recomendados antes={', '.join(context.recommended) or 'ninguno'}"
         )
         prompt = build_planner_prompt(situation, TOOLS_DOC, AgentPlan.model_json_schema())
         try:
             plan, provider = complete_json(self.llm_chain, prompt, AgentPlan)
         except LLMUnavailableError:
             return [], "rules", None
-        run.trace.append(AgentStep.PLAN)
         return list(plan.steps), provider, plan.thought or None
 
     def _plan_state(self, run: _Run) -> PlanState:

@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -223,15 +224,23 @@ def load_databricks(settings: Settings | None = None) -> BuiltArtifacts:
     repo = DatabricksSQLRepository(
         settings.databricks.profile or "", warehouse, settings.databricks.catalog
     )
-    products = repo.load_products()
+    # Independent reads (SQL statements + one volume file): in parallel, not one after another.
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        products_f, chunks_f = pool.submit(repo.load_products), pool.submit(repo.load_chunks)
+        graph_f = pool.submit(repo.load_graph)
+        names_f = pool.submit(_document_names_from_volume, settings, ws)
+        products, chunks, graph, names = (
+            products_f.result(),
+            chunks_f.result(),
+            graph_f.result(),
+            names_f.result(),
+        )
     catalog = [p.commercial for p in products if p.commercial is not None]
-    chunks = repo.load_chunks()
     source = (
         f"Databricks en vivo: {settings.databricks.catalog}.gold.* vía SQL warehouse {warehouse} "
         f"({len(products)} productos, {len(chunks)} chunks)"
     )
-    names = _document_names_from_volume(settings, ws)
-    return BuiltArtifacts(catalog, products, chunks, repo.load_graph(), JoinReport(), names, source)
+    return BuiltArtifacts(catalog, products, chunks, graph, JoinReport(), names, source)
 
 
 def load_or_build(settings: Settings | None = None) -> BuiltArtifacts:

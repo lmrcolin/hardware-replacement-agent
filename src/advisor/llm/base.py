@@ -44,20 +44,28 @@ class DatabricksFMAPIClient(LLMClient):
 
     name = "databricks"
 
+    JSON_TOKENS, TEXT_TOKENS = 500, 450  # output length dominates latency (~35 tokens/s)
+
     def __init__(self, endpoint: str, profile: str | None, timeout_s: float = 30.0) -> None:
         self.endpoint, self.profile, self.timeout_s = endpoint, profile, timeout_s
+        self._client: Any = None  # one WorkspaceClient: auth is resolved once, not per call
 
-    def _chat(self, prompt: str) -> str:
-        try:
+    def _workspace(self) -> Any:
+        if self._client is None:
             from databricks.sdk import WorkspaceClient
+
+            self._client = WorkspaceClient(profile=self.profile)
+        return self._client
+
+    def _chat(self, prompt: str, max_tokens: int = TEXT_TOKENS) -> str:
+        try:
             from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
 
-            client = WorkspaceClient(profile=self.profile)
-            response = client.serving_endpoints.query(
+            response = self._workspace().serving_endpoints.query(
                 name=self.endpoint,
                 messages=[ChatMessage(role=ChatMessageRole.USER, content=prompt)],
                 temperature=0.0,
-                max_tokens=1200,
+                max_tokens=max_tokens,
             )
             message = response.choices[0].message if response.choices else None
             content = message.content if message else None
@@ -68,10 +76,10 @@ class DatabricksFMAPIClient(LLMClient):
         return str(content)
 
     def complete_json[T: BaseModel](self, prompt: str, schema: type[T]) -> T:
-        return schema.model_validate_json(_json_object(self._chat(prompt)))
+        return schema.model_validate_json(_json_object(self._chat(prompt, self.JSON_TOKENS)))
 
     def generate(self, prompt: str) -> str:
-        return self._chat(prompt).strip()
+        return self._chat(prompt, self.TEXT_TOKENS).strip()
 
 
 class OllamaClient(LLMClient):

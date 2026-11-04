@@ -85,6 +85,15 @@ cada respuesta indica qué motor aportó la evidencia (`bm25 N, ai_search N`) y 
 En Databricks: Query History del warehouse, peticiones del serving endpoint de Llama, métricas del endpoint
 `emerson-vs` y `system.billing.usage`.
 
+La barra lateral guarda el **historial y las más buscadas** (últimos 7 días, en
+`.cache/advisor/searches.jsonl`, ignorado por git; `ADVISOR_SEARCH_LOG` lo cambia).
+
+**Voz.** `make app` instala el extra `voice`: el campo de mensaje tiene micrófono, la transcripción es local con
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper) (modelo `small`, ~460 MB la primera vez;
+`ADVISOR_WHISPER_MODEL=base` para uno más ligero) con los part numbers del catálogo como vocabulario, y las
+respuestas a preguntas dictadas se leen con la voz del navegador (`speechSynthesis`; "Responder con voz" en ⋮ lo
+activa siempre). Gratis y sin servicios externos; el audio no sale del equipo.
+
 Búsqueda híbrida con AI Search (requiere `databricks auth login`):
 `ADVISOR_RETRIEVAL_BACKEND=hybrid ADVISOR_DATABRICKS_PROFILE=<perfil> make app` · comparar motores:
 `uv run python -m evaluation.run_eval --retriever bm25|ai_search|hybrid`.

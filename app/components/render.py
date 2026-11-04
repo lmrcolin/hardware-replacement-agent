@@ -244,7 +244,7 @@ def clarification_options(question: str | None, known: Iterable[str]) -> list[st
 def original_card(product: Product, *, key: str = "original") -> None:
     c = product.commercial
     with st.container(key=f"card-{key}"):
-        left, right = st.columns([1, 6])
+        left, right = st.columns([1, 5], gap="small")
         left.markdown(image_html(product), unsafe_allow_html=True)
         with right:
             st.markdown(f"**Pieza original: {product.part_number}**")
@@ -280,29 +280,37 @@ def comparison_table(rec: Recommendation) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def facts_html(c: CommercialInformation, coverage: float) -> str:
+    """Catalog facts as wrapping chips (never squeezed into a narrow column)."""
+    chips = [
+        ("Precio (catálogo)", price_text(c)),
+        ("Stock", stock_text(c)),
+        ("Requisitos obligatorios", f"{coverage:.0%} cubiertos"),
+        ("Estado", c.status.value),
+    ]
+    return (
+        '<div class="facts">'
+        + "".join(f"<span><small>{escape(k)}</small><b>{escape(v)}</b></span>" for k, v in chips)
+        + "</div>"
+    )
+
+
 def recommendation_card(rec: Recommendation, names: dict[str, str], *, key: str) -> None:
     c = rec.commercial
     with st.container(key=f"card-{key}"):
-        left, mid, right = st.columns([1, 4.2, 1.7])
+        left, body = st.columns([1, 5], gap="small")
         left.markdown(image_html(rec.product), unsafe_allow_html=True)
-        with mid:
+        with body:
             st.subheader(f"{rec.rank}. {rec.product.part_number}", anchor=False)
             st.markdown(
                 f"{LEVEL_BADGE[rec.compatibility.level]} · {c.description} · {c.manufacturer}"
             )
-            st.write(rec.rationale)
-            if rec.compatibility.conditions:
-                st.markdown(
-                    "**Condiciones**\n" + "\n".join(f"- {x}" for x in rec.compatibility.conditions)
-                )
-        with right:
-            _html(
-                f'<div class="fact"><span>Precio (catálogo)</span><b>{escape(price_text(c))}</b>'
-                f'</div><div class="fact"><span>Stock</span><b>{escape(stock_text(c))}</b></div>'
-                f'<div class="fact"><span>Requisitos obligatorios</span>'
-                f"<b>{rec.compatibility.coverage:.0%} cubiertos</b></div>"
+            _html(facts_html(c, rec.compatibility.coverage))
+        st.write(rec.rationale)
+        if rec.compatibility.conditions:
+            st.markdown(
+                "**Condiciones**\n" + "\n".join(f"- {x}" for x in rec.compatibility.conditions)
             )
-            st.markdown(STATUS_BADGE[c.status])
         compare, evidence = st.tabs(
             ["Comparación de especificaciones", f"Evidencia ({len(rec.evidence)} citas)"]
         )

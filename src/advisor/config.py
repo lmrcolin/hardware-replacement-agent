@@ -45,7 +45,7 @@ class LLMSettings(BaseModel):
     databricks_endpoint: str = "databricks-meta-llama-3-3-70b-instruct"
     ollama_model: str = "qwen3:4b"
     ollama_host: str = "http://localhost:11434"
-    anthropic_model: str = "claude-opus-5-5"  # key in ANTHROPIC_API_KEY (.env), never in config
+    anthropic_model: str = "claude-haiku-5-5"  # key in ANTHROPIC_API_KEY (.env), never in config
     anthropic_effort: Effort = "low"  # NLU/NLG are short, well-specified tasks
     timeout_s: float = 30.0
 

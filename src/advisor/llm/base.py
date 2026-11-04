@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -74,13 +77,35 @@ class DatabricksFMAPIClient(LLMClient):
         return self._chat(prompt).strip()
 
 
+# NLG instruction: the agent's draft is already complete and verified; Claude only makes it read
+# well. Brevity is asked for explicitly (no greetings/headings), and nothing may be added.
+NLG_SYSTEM = (
+    "Eres el redactor de un asesor de reemplazo de componentes electrónicos. Reescribe el "
+    "borrador que recibes para el cliente, en español, claro y breve. Reglas: conserva todos "
+    "los part numbers, cifras, fechas, estados y condiciones del borrador, escritos "
+    "exactamente igual; no agregues datos, opiniones ni recomendaciones que no estén en el "
+    "borrador; sin saludos, despedidas, encabezados ni frases de relleno; usa viñetas cortas "
+    "cuando haya varias opciones; no seas más largo que el borrador."
+)
+
+
+@dataclass
+class LLMCall:
+    kind: str  # "json" (NLU/plan) or "text" (NLG)
+    seconds: float
+    input_tokens: int = 0
+    output_tokens: int = 0
+    ok: bool = True
+
+
 class AnthropicClient(LLMClient):
     """Claude via the official Anthropic SDK (optional extra ``claude``; key in ANTHROPIC_API_KEY).
 
     NLU uses structured outputs (``messages.parse`` with the Pydantic schema), so the answer is
     validated JSON by construction; NLG returns plain text that the agent's VERIFY step checks.
     Any API error, refusal or truncation raises LLMUnavailableError: the chain moves on to the
-    next provider (ending in the template), exactly as with the other clients.
+    next provider (ending in the template), exactly as with the other clients. Every call is
+    recorded in ``calls`` (tokens, latency) so cost per query can be measured.
     """
 
     name = "anthropic"
@@ -88,50 +113,67 @@ class AnthropicClient(LLMClient):
     def __init__(self, model: str, effort: str = "low", timeout_s: float = 30.0) -> None:
         self.model, self.effort, self.timeout_s = model, effort, timeout_s
         self._client: Any = None
+        self.calls: list[LLMCall] = []
 
     def _api(self) -> Any:
         if self._client is None:
             import anthropic  # optional dependency: uv sync --extra claude
 
-            self._client = anthropic.Anthropic(timeout=self.timeout_s, max_retries=1)
+            # Transient API errors (429, 5xx, timeouts, dropped connections) are retried with
+            # backoff before the chain gives up on Claude and falls back to the template.
+            self._client = anthropic.Anthropic(timeout=self.timeout_s, max_retries=2)
         return self._client
 
-    def _request(self, prompt: str) -> dict[str, Any]:
-        return {
+    def _request(self, prompt: str, *, system: str | None = None) -> dict[str, Any]:
+        request: dict[str, Any] = {
             "model": self.model,
-            "max_tokens": 8000,  # adaptive thinking shares this budget; answers are short
+            "max_tokens": 4000,  # adaptive thinking shares this budget; answers are short
             "output_config": {"effort": self.effort},
             "messages": [{"role": "user", "content": prompt}],
         }
+        if system:
+            request["system"] = system
+        return request
 
-    @staticmethod
-    def _check(response: Any) -> None:
-        if response.stop_reason == "refusal":
-            raise LLMUnavailableError("anthropic: refusal")
-        if response.stop_reason == "max_tokens":
-            raise LLMUnavailableError("anthropic: answer truncated (max_tokens)")
-
-    def complete_json[T: BaseModel](self, prompt: str, schema: type[T]) -> T:
+    def _call(self, kind: str, method: Callable[..., Any], **request: Any) -> Any:
         import anthropic
 
+        started = time.perf_counter()
+        call = LLMCall(kind, 0.0)
         try:
-            response = self._api().messages.parse(**self._request(prompt), output_format=schema)
+            response = method(**request)
+            usage = getattr(response, "usage", None)
+            call.input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+            call.output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+            if response.stop_reason == "refusal":
+                raise LLMUnavailableError("anthropic: refusal")
+            if response.stop_reason == "max_tokens":
+                raise LLMUnavailableError("anthropic: answer truncated (max_tokens)")
+            return response
         except anthropic.APIError as exc:
+            call.ok = False
             raise LLMUnavailableError(f"anthropic: {exc}") from exc
-        self._check(response)
+        except LLMUnavailableError:
+            call.ok = False
+            raise
+        finally:
+            call.seconds = time.perf_counter() - started
+            self.calls.append(call)
+
+    def complete_json[T: BaseModel](self, prompt: str, schema: type[T]) -> T:
+        response = self._call(
+            "json", self._api().messages.parse, **self._request(prompt), output_format=schema
+        )
         parsed = response.parsed_output
         if parsed is None:
+            self.calls[-1].ok = False
             raise LLMUnavailableError("anthropic: no structured output")
         return schema.model_validate(parsed)
 
     def generate(self, prompt: str) -> str:
-        import anthropic
-
-        try:
-            response = self._api().messages.create(**self._request(prompt))
-        except anthropic.APIError as exc:
-            raise LLMUnavailableError(f"anthropic: {exc}") from exc
-        self._check(response)
+        response = self._call(
+            "text", self._api().messages.create, **self._request(prompt, system=NLG_SYSTEM)
+        )
         return "".join(b.text for b in response.content if b.type == "text").strip()
 
 

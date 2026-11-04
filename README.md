@@ -99,8 +99,9 @@ La barra lateral guarda el **historial y las más buscadas** (últimos 7 días, 
 **Claude (opcional, de pago).** Proveedor `anthropic` con el SDK oficial (extra `claude`, que `make app` instala):
 `ANTHROPIC_API_KEY=<key>` y `ADVISOR_LLM_PROVIDERS=anthropic,template` en `.env` (nunca en el repo). Igual que Llama,
 solo interpreta (JSON validado con salidas estructuradas) y redacta (verificado por el paso VERIFY); la
-compatibilidad la siguen decidiendo las reglas. Modelo `claude-opus-5-5` con esfuerzo `low`
-(`ADVISOR_ANTHROPIC_MODEL` / `ADVISOR_ANTHROPIC_EFFORT`); ~3 llamadas por consulta (~US$ 0,03). Si falla o rechaza,
+compatibilidad la siguen decidiendo las reglas. Modelo por defecto `claude-haiku-5-5` con esfuerzo `low`
+(`ADVISOR_ANTHROPIC_MODEL=claude-sonnet-5-5` para subir de nivel; `ADVISOR_ANTHROPIC_EFFORT`); ~3 llamadas por
+consulta. La redacción tiene reglas de brevedad (sin saludos ni encabezados, sin agregar datos). Si falla o rechaza,
 la cadena pasa al siguiente proveedor hasta `template`.
 
 **Voz.** `make app` instala el extra `voice`: el campo de mensaje tiene micrófono, la transcripción es local con

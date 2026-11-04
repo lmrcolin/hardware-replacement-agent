@@ -19,7 +19,7 @@ llm:
   databricks_endpoint: databricks-meta-llama-3-3-70b-instruct
   ollama_model: "qwen3:4b"
   ollama_host: http://localhost:11434
-  anthropic_model: claude-opus-5-5      # proveedor "anthropic"; la key va en ANTHROPIC_API_KEY (.env)
+  anthropic_model: claude-haiku-5-5     # proveedor "anthropic"; la key va en ANTHROPIC_API_KEY (.env)
   anthropic_effort: low
   timeout_s: 30
 

@@ -17,6 +17,7 @@ from html import escape
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -37,6 +38,8 @@ from components.render import (
     response_view,
 )
 from components.theme import CSS
+from components.voice import available as voice_available
+from components.voice import message_from, speak_html, transcribe
 from mock_agent import MockAdvisorAgent
 
 from advisor.agent import Advisor, AdvisorAgent
@@ -71,6 +74,7 @@ class Turn:
     response: RecommendationResponse
     trace: list[str]
     found_by: str | None
+    voice: bool = False  # the question was dictated
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
 
 
@@ -97,15 +101,31 @@ turns: list[Turn] = state.setdefault("turns", [])
 search_log = SearchLog()
 
 
+def _vocabulary() -> list[str]:
+    if state.get("agent", REAL) != REAL:
+        return []
+    return [p.part_number for p in get_artifacts().products]
+
+
+def _transcriber(audio: bytes) -> str:
+    try:
+        return transcribe(audio, vocabulary=_vocabulary())
+    except Exception as exc:  # model download or decoding problems must not break the chat
+        state["voice_error"] = f"No pude transcribir el audio ({str(exc)[:160]})."
+        return ""
+
+
 def ask(text: str | None = None, *, follow_up: bool = True) -> None:
-    """Callback: queue a message. Answers to a clarification carry the previous question."""
-    text = (text if text is not None else state.get("chat") or "").strip()
+    """Callback: queue a message (typed, clicked or dictated); the agent keeps the context."""
+    value = text if text is not None else state.get("chat")
+    text, by_voice = message_from(value, _transcriber if voice_available() else None)
     if not text:
+        if getattr(value, "audio", None) is not None and not state.get("voice_error"):
+            state["voice_error"] = "No entendí el audio; intenta de nuevo o escribe tu mensaje."
         return
-    sent = text
-    if follow_up and turns and turns[-1].response.clarification_question:
-        sent = f"{turns[-1].sent} {text}"
-    state["pending"] = (text, sent)
+    # The agent remembers the conversation through response.context (contract 1.2.0).
+    state["pending"] = (text, text, by_voice)
+    state["fresh"] = not follow_up
     state["minimized"] = False
 
 
@@ -181,7 +201,10 @@ with st.sidebar:
 minimized = state.get("minimized", False)
 kind = state.get("agent", REAL)
 with st.container(key="widget-head"):
-    who, menu, fold = st.columns([8, 0.7, 0.7], vertical_alignment="center")
+    with st.container(horizontal=True, vertical_alignment="center", gap="small"):
+        who = st.container(width="stretch")
+        menu = st.container(width=48)
+        fold = st.container(width=48)
     online = "En línea" if kind == REAL else "Modo simulado"
     who.markdown(
         '<div class="head-id"><div class="avatar">AI</div><div><small>Chat con</small><br>'
@@ -218,6 +241,14 @@ with st.container(key="widget-head"):
             ),
             unsafe_allow_html=True,
         )
+        st.markdown("**Voz**")
+        st.toggle("Responder con voz", key="tts", help="Lee en voz alta cada respuesta.")
+        st.caption(
+            "Micrófono en el campo de mensaje: transcripción local con faster-whisper; las "
+            "respuestas a preguntas dictadas se leen en voz alta."
+            if voice_available()
+            else "Para hablarle al agente instala la voz: `uv sync --extra voice`."
+        )
         st.caption(
             "Cómo decide: estado, precio y stock salen solo del catálogo; la compatibilidad la "
             "deciden reglas deterministas con evidencia; solo recomienda piezas ACTIVE; el LLM "
@@ -236,12 +267,13 @@ known_parts = [p.part_number for p in get_artifacts().products] if kind == REAL 
 # ---------------------------------------------------------------- run the agent
 pending = state.pop("pending", None)
 if pending:
-    shown, sent = pending
-    with st.spinner("El agente está analizando: interpreta, consulta catálogo y grafo, valida…"):
-        response = agent.answer(CustomerQuery(text=sent))
+    shown, sent, by_voice = pending
+    memory = turns[-1].response.context if turns and not state.pop("fresh", False) else None
+    with st.spinner("El agente está planeando y usando sus herramientas…"):
+        response = agent.answer(CustomerQuery(text=sent, context=memory))
     trace = [str(step) for step in getattr(agent, "last_trace", [])]
     found_by = evidence_sources(agent.retriever) if isinstance(agent, AdvisorAgent) else None
-    turn = Turn(shown, sent, response, trace, found_by)
+    turn = Turn(shown, sent, response, trace, found_by, voice=by_voice)
     turns.append(turn)
     search_log.append(search_record(turn.id, shown, sent, response, source=kind))
     st.query_params["k"] = sent
@@ -258,7 +290,7 @@ with st.chat_message("assistant"):
         "y te muestro la evidencia. Si me falta un dato, te pregunto."
     )
     if not turns:
-        with st.container(key="quick-examples"):
+        with st.container(key="quick-examples", horizontal=True, gap="small"):
             for i, (label, text) in enumerate(EXAMPLES.items()):
                 st.button(
                     label, key=f"ex-{i}", on_click=ask, args=(text,), kwargs={"follow_up": False}
@@ -266,28 +298,31 @@ with st.chat_message("assistant"):
         if kind == REAL:
             risky = parts_to_replace(get_artifacts().products)
             st.caption(f"O elige una de las {len(risky)} piezas que necesitan reemplazo:")
-            cols = st.columns(5)
-            for i, product in enumerate(risky):
-                assert product.commercial is not None
-                status = product.commercial.status
-                color = "orange" if status is CommercialStatus.NRND else "red"
-                with cols[i % 5], st.container(key=f"part-{product.part_number}"):
-                    st.markdown(
-                        image_html(product, css_class="pimg pimg-mini"), unsafe_allow_html=True
-                    )
-                    st.markdown(f":{color}-badge[{status.value}]")
-                    st.button(
-                        product.part_number,
-                        key=f"pick-{product.part_number}",
-                        on_click=ask,
-                        args=(f"Necesito reemplazar la {product.part_number}",),
-                        kwargs={"follow_up": False},
-                        width="stretch",
-                    )
+            with st.container(key="parts-grid", horizontal=True, gap="small"):
+                for product in risky:
+                    assert product.commercial is not None
+                    status = product.commercial.status
+                    color = "orange" if status is CommercialStatus.NRND else "red"
+                    with st.container(key=f"part-{product.part_number}", width=150):
+                        st.markdown(
+                            image_html(product, css_class="pimg pimg-mini"),
+                            unsafe_allow_html=True,
+                        )
+                        st.markdown(f":{color}-badge[{status.value}]")
+                        st.button(
+                            product.part_number,
+                            key=f"pick-{product.part_number}",
+                            on_click=ask,
+                            args=(f"Necesito reemplazar la {product.part_number}",),
+                            kwargs={"follow_up": False},
+                            width="stretch",
+                        )
 
 for i, turn in enumerate(turns):
     with st.chat_message("user"):
         st.write(turn.shown)
+        if turn.voice:
+            st.caption("🎙️ Dictado por voz")
         if turn.sent != turn.shown:
             st.caption(f"Enviado al agente con el contexto anterior: “{turn.sent}”")
     with st.chat_message("assistant"):
@@ -296,24 +331,37 @@ for i, turn in enumerate(turns):
         if steps:
             reasoning_view(steps, turn.response)
         response_view(turn.response, names, turn=i)
-        options = clarification_options(turn.response.clarification_question, known_parts)
+        options = turn.response.clarification_options or clarification_options(
+            turn.response.clarification_question, known_parts
+        )
         if options and i == len(turns) - 1:
-            with st.container(key=f"quick-options-{i}"):
+            with st.container(key=f"quick-options-{i}", horizontal=True, gap="small"):
                 for pn in options:
                     st.button(pn, key=f"opt-{i}-{pn}", on_click=ask, args=(pn,))
-        with st.container(key=f"rating-{i}"):
-            left, right = st.columns([3, 1], vertical_alignment="center")
-            left.caption(
+        with st.container(
+            key=f"rating-{i}", horizontal=True, horizontal_alignment="distribute",
+            vertical_alignment="center",
+        ):  # fmt: skip
+            st.caption(
                 f"Redacción: {turn.response.llm_provider} · contrato "
                 f"{turn.response.contract_version}"
             )
-            with right:
+            with st.container(horizontal=True, gap="small", width="content",
+                              vertical_alignment="center"):  # fmt: skip
                 st.caption("¿Te fue útil?")
                 st.feedback("thumbs", key=f"fb-{turn.id}", on_change=rate, args=(turn.id,))
+
+# Read the newest answer aloud once: always for dictated questions, or when the toggle is on.
+if turns and state.get("spoken") != turns[-1].id and (turns[-1].voice or state.get("tts")):
+    last = turns[-1].response
+    components.html(speak_html(last.clarification_question or last.message), height=0)
+    state["spoken"] = turns[-1].id
+if state.get("voice_error"):
+    st.warning(state.pop("voice_error"))
 
 placeholder = (
     "Responde a la pregunta del agente…"
     if turns and turns[-1].response.clarification_question
     else "Escribe tu mensaje…"
 )
-st.chat_input(placeholder, key="chat", on_submit=ask)
+st.chat_input(placeholder, key="chat", on_submit=ask, accept_audio=voice_available())

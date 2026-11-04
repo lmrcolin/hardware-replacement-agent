@@ -37,7 +37,21 @@ REPLACE_WORDS = (
     r"reemplaz|sustitu|ya no (?:la|lo|las|los)? ?encuentr|descontinu|alternativ"
     r"|replace|substitut|discontinu|equivalente"
 )
-STATUS_WORDS = r"\bestado\b|disponib|\bstock\b|inventario|\bprecio\b|status|price|availab"
+STATUS_WORDS = (
+    r"\bestado\b|disponib|\bstock\b|inventario|\bprecio\b|cu[aá]nto cuesta|status|price|availab"
+)
+CHEAP_WORDS = r"barat|econ[oó]mic|cheap|low[- ]cost|menor precio|bajo costo|presupuesto"
+COMPARE_WORDS = r"comp[aá]r|\bvs\.?\b|versus|diferencias? entre|\bdifference"
+QUESTION_WORDS = (
+    r"^\s*¿|\?\s*$|^\s*(?:qu[eé]|cu[aá]l|cu[aá]nt[oa]s?|soporta|tiene|admite|es compatible|"
+    r"does|what|which|how much|is it|can it)\b"
+)
+# "ya no necesito IPsec", "sin RDMA", "quita el requisito de TLS": requirements to drop (follow-ups)
+REMOVE_SPAN = re.compile(
+    r"(?:ya no (?:necesito|requiero|hace falta|importa)|no (?:necesito|requiero|hace falta)"
+    r"|\bsin\b|quita(?:r|le)?(?: el requisito de)?|olvida|no importa|without|drop)\s+([^.;,]+)",
+    re.I,
+)
 UNIT_TOKEN = re.compile(
     r"^\d+(?:\.\d+)?(?:gbe|gb|tb|mb|kb|mhz|ghz|khz|w|v|a|bits?|g|ms/s|ks/s|ksps|msps|x\d*)$", re.I
 )
@@ -160,16 +174,52 @@ def part_tokens(text: str) -> list[str]:
     return out
 
 
-def parse_query(text: str) -> ParsedQuery:
-    category = detect_category(text)
-    parts = part_tokens(text)
-    requirements = _requirements(text, category)
+def _removals(text: str, category: Category | None) -> tuple[str, list[str]]:
+    """(text without the "ya no necesito X" spans, keys/values to drop)."""
+    removed: list[str] = []
+    kept = text
+    for match in REMOVE_SPAN.finditer(text):
+        span = match.group(1)
+        found = _requirements(span, category)
+        if not found:
+            continue
+        kept = kept.replace(match.group(0), " ")
+        removed += [r.key if r.value == "*" else str(r.value) for r in found]
+    return kept, removed
+
+
+def explicit_intent(text: str) -> str | None:
+    """Intent stated by unambiguous words (replace / compare / question), else None."""
     lowered = text.lower()
-    intent: Literal["replace", "find", "status", "other"]
+    if re.search(REPLACE_WORDS, lowered):
+        return "replace"
+    if re.search(COMPARE_WORDS, lowered):
+        return "compare"
+    question = re.search(QUESTION_WORDS, lowered) and not re.search(CHEAP_WORDS, lowered)
+    if question and not re.search(STATUS_WORDS, lowered) and not REMOVE_SPAN.search(text):
+        return "question"
+    return None
+
+
+def parse_query(text: str, category_hint: Category | None = None) -> ParsedQuery:
+    """``category_hint``: the category remembered from the conversation (short follow-ups such as
+    "400 Gb/s" or "ya no necesito IPsec" do not name it)."""
+    category = detect_category(text) or category_hint
+    parts = part_tokens(text)
+    kept, remove = _removals(text, category)
+    requirements = _requirements(kept, category)
+    lowered = text.lower()
+    intent: Literal["replace", "find", "status", "question", "compare", "other"]
     if re.search(REPLACE_WORDS, lowered):
         intent = "replace"
+    elif re.search(COMPARE_WORDS, lowered):
+        intent = "compare"
     elif re.search(STATUS_WORDS, lowered) and parts:
         intent = "status"
+    elif re.search(QUESTION_WORDS, lowered) and not (
+        remove or requirements or re.search(CHEAP_WORDS, lowered)
+    ):
+        intent = "question"
     elif category or requirements:
         intent = "find"
     else:
@@ -181,6 +231,7 @@ def parse_query(text: str) -> ParsedQuery:
         part_numbers=parts,
         category=category,
         requirements=requirements,
+        remove=remove,
         needs_clarification=needs,
         clarification_question=(
             "¿Qué part number quieres reemplazar o qué tipo de componente necesitas?"

@@ -1,5 +1,5 @@
 {
-  "contract_version": "1.1.0",
+  "contract_version": "1.2.0",
   "query": {
     "text": "Necesito una NIC de 100 GbE con RDMA e IPsec offload. Usábamos la SYN-NIC-100.",
     "language": "es",

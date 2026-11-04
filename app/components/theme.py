@@ -21,7 +21,11 @@ BOT_BUBBLE = "#EEF2F4"
 CSS = f"""
 <style>
 .stApp {{ background: {PAGE}; }}
-[data-testid="stMainBlockContainer"] {{ max-width: 980px; padding-top: 1rem; }}
+/* main column and the pinned input share the same width and gutters (no misalignment) */
+[data-testid="stMainBlockContainer"], [data-testid="stBottomBlockContainer"] {{
+  max-width: 980px; padding-left: 1.5rem; padding-right: 1.5rem;
+}}
+[data-testid="stMainBlockContainer"] {{ padding-top: 1rem; padding-bottom: 6rem; }}
 
 /* ---- widget header: avatar, name, status, settings, minimize ---- */
 .st-key-widget-head {{
@@ -76,12 +80,17 @@ CSS = f"""
 [data-testid="stChatMessageAvatarAssistant"] {{ background: {ACCENT}; color: #fff; }}
 [data-testid="stChatMessageAvatarUser"] {{ background: {ACCENT_SOFT}; color: {ACCENT}; }}
 
-/* ---- quick replies: outlined pills ---- */
-[class*="st-key-quick-"] {{ display: flex; flex-flow: row wrap; gap: 8px; }}
-[class*="st-key-quick-"] > div {{ width: auto !important; flex: 0 0 auto; }}
-[class*="st-key-quick-"] button, [class*="st-key-part-"] button {{
+/* ---- quick replies: outlined pills (horizontal containers wrap on their own) ---- */
+[class*="st-key-quick-"] button {{
   border: 1.5px solid {ACCENT}; color: {ACCENT}; background: #fff; border-radius: 999px;
-  padding: 4px 14px; min-height: 34px;
+  padding: 4px 14px; min-height: 34px; white-space: nowrap;
+}}
+[class*="st-key-part-"] button {{
+  border: 1.5px solid {ACCENT}; color: {ACCENT}; background: #fff; border-radius: 10px;
+  padding: 2px 6px; min-height: 30px;
+}}
+[class*="st-key-part-"] button p {{
+  font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }}
 [class*="st-key-quick-"] button:hover, [class*="st-key-part-"] button:hover {{
   background: {ACCENT}; color: #fff; border-color: {ACCENT};
@@ -107,16 +116,19 @@ ol.steps li::before {{
   background: {CARD}; border: 1px solid {LINE}; border-radius: 12px; padding: 12px 14px;
 }}
 [class*="st-key-card-"] h3 {{ font-size: 17px; padding: 0; color: {INK}; }}
-.fact {{ margin-bottom: 6px; }}
-.fact span {{ display: block; font-size: 11px; color: {MUTED}; text-transform: uppercase; }}
-.fact b {{ font-size: 14px; color: {INK}; }}
+/* image column keeps a fixed width so photo credits never collapse letter by letter */
+[class*="st-key-card-"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {{
+  flex: 0 0 120px !important; min-width: 120px; max-width: 120px;
+}}
+.facts {{ display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 4px 0; }}
+.facts span {{
+  background: {ACCENT_SOFT}; border-radius: 8px; padding: 4px 10px; line-height: 1.25;
+}}
+.facts small {{ display: block; font-size: 10px; color: {MUTED}; text-transform: uppercase; }}
+.facts b {{ font-size: 13px; color: {INK}; white-space: nowrap; }}
 
 /* ---- rating row ---- */
-[class*="st-key-rating-"] {{ border-top: 1px solid {LINE}; padding-top: 4px; margin-top: 4px; }}
-[class*="st-key-rating-"] [data-testid="stColumn"]:last-child {{
-  display: flex; flex-direction: row; align-items: center; justify-content: flex-end; gap: 6px;
-}}
-[class*="st-key-rating-"] [data-testid="stColumn"]:last-child > div {{ width: auto !important; }}
+[class*="st-key-rating-"] {{ border-top: 1px solid {LINE}; padding-top: 6px; margin-top: 4px; }}
 
 /* ---- input: rounded pill with teal send button ---- */
 [data-testid="stChatInput"] {{ border-radius: 999px; border: 1.5px solid {LINE}; }}
@@ -137,19 +149,27 @@ ol.steps li::before {{
 .pimg-note a {{ color: {MUTED}; text-decoration: underline; }}
 .pimg-mini .pimg-note {{ display: none; }}
 [class*="st-key-part-"] {{
-  background: {CARD}; border: 1px solid {LINE}; border-radius: 10px; padding: 6px;
-  text-align: center;
+  background: {CARD}; border: 1px solid {LINE}; border-radius: 10px; padding: 8px 6px;
+  text-align: center; gap: 8px;
 }}
+/* no negative markdown margins inside tiles: image, badge and button stack without touching */
+[class*="st-key-part-"] [data-testid="stMarkdownContainer"],
+[class*="st-key-part-"] [data-testid="stMarkdownContainer"] p {{
+  margin: 0 !important; font-size: 11px; line-height: 1.4;
+}}
+[class*="st-key-part-"] [data-testid="stElementContainer"] {{ margin: 0 !important; }}
 
 /* ---- sidebar: history and trends ---- */
 [data-testid="stSidebar"] {{ background: {CARD}; }}
-[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{ gap: .3rem; }}
-[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(button) {{ margin: 0; }}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{ gap: .45rem; }}
 [data-testid="stSidebar"] button[kind="tertiary"] {{
   color: {INK}; text-align: left; justify-content: flex-start; padding: 2px 0;
 }}
 [data-testid="stSidebar"] button[kind="tertiary"]:hover {{ color: {ACCENT}; }}
-.trend {{ margin: -6px 0 8px 0; font-size: 12px; color: {MUTED}; }}
+.trend {{ margin: 0 0 10px 0; font-size: 12px; color: {MUTED}; line-height: 1.3; }}
+[data-testid="stSidebar"] h3 {{ padding: 0 0 .25rem 0; line-height: 1.3; }}
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {{ margin: 0; line-height: 1.35; }}
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {{ margin-bottom: 0 !important; }}
 .trend .bar {{ height: 6px; border-radius: 3px; background: {ACCENT}; opacity: .8; margin: 2px 0; }}
 .trend .up {{ color: {ACCENT}; }}
 .trend .down {{ color: #B42318; }}

@@ -45,14 +45,14 @@ eval: ## Run evaluation over evaluation/gold_set.yaml
 eval-blind: ## Run evaluation over the blind set (evaluation/blind_set.yaml)
 	$(UV) run python -m evaluation.run_eval --gold evaluation/blind_set.yaml
 
-app: ## Streamlit chat UI over the real agent (artifacts/ or in-memory build)
-	$(UV) run streamlit run app/streamlit_app.py
+app: ## Streamlit chat UI over the real agent (artifacts/ or in-memory build; voice extra)
+	$(UV) run --extra voice streamlit run app/streamlit_app.py
 
 DATABRICKS_ENV = ADVISOR_DATABRICKS_PROFILE=$(PROFILE) ADVISOR_REPOSITORY_BACKEND=databricks_sql \
 	ADVISOR_RETRIEVAL_BACKEND=hybrid ADVISOR_LLM_PROVIDERS=databricks,template
 
 app-databricks: ## Chat UI fully on Databricks: Delta tables, AI Search, Llama (PROFILE=<perfil> opcional)
-	$(DATABRICKS_ENV) $(UV) run streamlit run app/streamlit_app.py
+	$(DATABRICKS_ENV) $(UV) run --extra voice streamlit run app/streamlit_app.py
 
 eval-databricks: ## Evaluation fully on Databricks (Delta + hybrid search + Llama), no report rewrite
 	$(DATABRICKS_ENV) $(UV) run python -m evaluation.run_eval --retriever hybrid --llm configured --no-report

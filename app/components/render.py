@@ -78,7 +78,27 @@ STEP_TITLE = {
     "RANK": "Ordenar resultados",
     "COMPOSE": "Redactar la respuesta",
     "VERIFY": "Verificar cifras del texto",
+    "PLAN": "Planear qué herramientas usar",
+    "RELAX": "Negociar requisitos",
+    "ANSWER": "Responder con los datasheets",
+    "COMPARE": "Comparar productos",
 }
+TOOL_LABEL = {
+    "lookup_part": "Identificar la pieza",
+    "find_substitutes": "Buscar y validar sustitutos",
+    "search_catalog": "Buscar en el catálogo por requisitos",
+    "relax_requirements": "Negociar requisitos",
+    "ask_datasheets": "Consultar datasheets",
+    "compare": "Comparar productos",
+    "ask_customer": "Preguntar al cliente",
+    "finish": "Responder",
+}
+
+
+def _decider(name: str) -> str:
+    if name.startswith("rules"):
+        return "reglas" + name[5:]
+    return {"databricks": "Llama 3.3 (Databricks)", "ollama": "Ollama"}.get(name, name)
 
 
 def _html(markup: str) -> None:
@@ -216,8 +236,26 @@ def reasoning(
 def reasoning_view(steps: Sequence[Step], response: RecommendationResponse) -> None:
     nlu, nlg = providers(response)
     llm = nlu if nlu == nlg else f"{nlu} → {nlg}"
-    label = f"Razonamiento del agente · {len(steps)} pasos · LLM: {llm}"
+    calls = response.tool_calls
+    planner = next((c.decided_by for c in calls if not c.decided_by.startswith("rules")), "rules")
+    label = (
+        f"Razonamiento del agente · {len(calls)} acciones · plan: {_decider(planner)} · LLM: {llm}"
+        if calls
+        else f"Razonamiento del agente · {len(steps)} pasos · LLM: {llm}"
+    )
     with st.status(label, state="complete", expanded=False):
+        if calls:
+            thought = next((c.thought for c in calls if c.thought), None)
+            if thought:
+                st.caption(f"Plan propuesto por {_decider(planner)}: “{thought}”")
+            items = "".join(
+                f"<li><b>{escape(TOOL_LABEL.get(c.tool, c.tool))}</b> "
+                f'<span class="step-key">{escape(_decider(c.decided_by))}</span>'
+                f'<div class="step-detail">{escape(c.summary)}</div></li>'
+                for c in calls
+            )
+            _html(f'<ol class="steps">{items}</ol>')
+            st.caption("Detalle de cada paso interno:")
         items = "".join(
             f'<li><span class="step-key">{escape(s.key)}</span> <b>{escape(s.title)}</b>'
             f'<div class="step-detail">{escape(s.detail)}</div></li>'
@@ -244,7 +282,7 @@ def clarification_options(question: str | None, known: Iterable[str]) -> list[st
 def original_card(product: Product, *, key: str = "original") -> None:
     c = product.commercial
     with st.container(key=f"card-{key}"):
-        left, right = st.columns([1, 6])
+        left, right = st.columns([1, 5], gap="small")
         left.markdown(image_html(product), unsafe_allow_html=True)
         with right:
             st.markdown(f"**Pieza original: {product.part_number}**")
@@ -280,29 +318,37 @@ def comparison_table(rec: Recommendation) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def facts_html(c: CommercialInformation, coverage: float) -> str:
+    """Catalog facts as wrapping chips (never squeezed into a narrow column)."""
+    chips = [
+        ("Precio (catálogo)", price_text(c)),
+        ("Stock", stock_text(c)),
+        ("Requisitos obligatorios", f"{coverage:.0%} cubiertos"),
+        ("Estado", c.status.value),
+    ]
+    return (
+        '<div class="facts">'
+        + "".join(f"<span><small>{escape(k)}</small><b>{escape(v)}</b></span>" for k, v in chips)
+        + "</div>"
+    )
+
+
 def recommendation_card(rec: Recommendation, names: dict[str, str], *, key: str) -> None:
     c = rec.commercial
     with st.container(key=f"card-{key}"):
-        left, mid, right = st.columns([1, 4.2, 1.7])
+        left, body = st.columns([1, 5], gap="small")
         left.markdown(image_html(rec.product), unsafe_allow_html=True)
-        with mid:
+        with body:
             st.subheader(f"{rec.rank}. {rec.product.part_number}", anchor=False)
             st.markdown(
                 f"{LEVEL_BADGE[rec.compatibility.level]} · {c.description} · {c.manufacturer}"
             )
-            st.write(rec.rationale)
-            if rec.compatibility.conditions:
-                st.markdown(
-                    "**Condiciones**\n" + "\n".join(f"- {x}" for x in rec.compatibility.conditions)
-                )
-        with right:
-            _html(
-                f'<div class="fact"><span>Precio (catálogo)</span><b>{escape(price_text(c))}</b>'
-                f'</div><div class="fact"><span>Stock</span><b>{escape(stock_text(c))}</b></div>'
-                f'<div class="fact"><span>Requisitos obligatorios</span>'
-                f"<b>{rec.compatibility.coverage:.0%} cubiertos</b></div>"
+            _html(facts_html(c, rec.compatibility.coverage))
+        st.write(rec.rationale)
+        if rec.compatibility.conditions:
+            st.markdown(
+                "**Condiciones**\n" + "\n".join(f"- {x}" for x in rec.compatibility.conditions)
             )
-            st.markdown(STATUS_BADGE[c.status])
         compare, evidence = st.tabs(
             ["Comparación de especificaciones", f"Evidencia ({len(rec.evidence)} citas)"]
         )
@@ -392,6 +438,23 @@ def response_view(response: RecommendationResponse, names: dict[str, str], *, tu
             )
             for rec in response.unverified_options:
                 recommendation_card(rec, names, key=f"{turn}-unv-{rec.rank}")
+    if response.relaxations:
+        with st.expander(
+            f"Si puedes prescindir de un requisito · {len(response.relaxations)}",
+            expanded=not response.recommendations,
+        ):
+            st.caption(
+                "No cumplen todo lo que pediste: cada opción se vuelve compatible solo si se quita "
+                "el requisito indicado. Confírmalo antes de comprar."
+            )
+            for i, relaxation in enumerate(response.relaxations):
+                st.markdown(f"**Sin {_requirement(relaxation.dropped)}:**")
+                recommendation_card(relaxation.option, names, key=f"{turn}-relax-{i}")
+    if response.citations:
+        with st.expander(f"Fuentes citadas · {len(response.citations)}"):
+            for ev in response.citations:
+                source = names.get(ev.document_id, ev.document_id[:12])
+                st.caption(f"{source} · p.{ev.page} — “{ev.quote}”")
     for warning in response.warnings:
         st.caption(f"Aviso: {warning}")
     with st.expander("Escalar a un experto"):

@@ -27,12 +27,20 @@ costo de operarlo frente a esa meta está en `cost/emerson_advisor_tco.xlsx`.
                      chunks + BM25 ◄────────────────┼────────────► grafo (NetworkX): familia, protocolos,
                                                     │               avisos de migración (MIGRATES_TO)
                                                     ▼
-      agente: PARSE → RESOLVE → CLARIFY | STATUS → DISCOVER → VALIDATE → RANK → COMPOSE → VERIFY
-                       │                                        │                         │
-              LLM solo interpreta                 motor de reglas determinista     LLM solo reformula;
-              (JSON validado y saneado)           (YAML; crítica ⇒ INCOMPATIBLE,   VERIFY rechaza cifras
-                                                   falta dato ⇒ UNKNOWN)            no verificadas
+      agente: NLU → memoria → PLAN → herramientas (con guardián) → COMPOSE → NLG → VERIFY
+                │                 │            │                                    │
+        JSON validado      Llama propone   identificar pieza · buscar sustitutos ·  VERIFY rechaza cifras
+        y saneado          el plan; sin    buscar en catálogo · negociar requisitos · no verificadas
+                           LLM, reglas     consultar datasheets · comparar · preguntar
+                                           (motor de reglas: crítica ⇒ INCOMPATIBLE, falta dato ⇒ UNKNOWN)
 ```
+
+**Un agente, no un formulario.** Llama decide qué herramientas usar y en qué orden; las herramientas son
+deterministas y el guardián corrige cualquier paso inválido (queda visible en "Razonamiento del agente"). Recuerda la
+conversación y entiende seguimientos ("¿y la más barata?", "compárala con la BCM57508", "ya no necesito IPsec",
+"con 200 me basta"); si no hay sustituto, **negocia**: dice qué se podría vender quitando un requisito (p. ej. A100 →
+H100 si se acepta SXM5); responde **preguntas técnicas** con specs y citas ("¿cuánto consume la H100?"); y cuando
+falta información pregunta lo que más reduce las opciones, con botones. Diseño: `docs/AGENT_DESIGN.md` (ADR-014).
 
 - **Solo ACTIVE** se recomienda; NRND aparece aparte como opción con riesgo; DISCONTINUED/EOL nunca.
 - **Ranking:** nivel > requisitos obligatorios cubiertos > puntuación; el stock solo desempata.
@@ -84,6 +92,15 @@ Cómo comprobar que se usa Databricks: menú **⋮ → Herramientas del agente**
 cada respuesta indica qué motor aportó la evidencia (`bm25 N, ai_search N`) y quién redactó (`databricks` = Llama).
 En Databricks: Query History del warehouse, peticiones del serving endpoint de Llama, métricas del endpoint
 `emerson-vs` y `system.billing.usage`.
+
+La barra lateral guarda el **historial y las más buscadas** (últimos 7 días, en
+`.cache/advisor/searches.jsonl`, ignorado por git; `ADVISOR_SEARCH_LOG` lo cambia).
+
+**Voz.** `make app` instala el extra `voice`: el campo de mensaje tiene micrófono, la transcripción es local con
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper) (modelo `small`, ~460 MB la primera vez;
+`ADVISOR_WHISPER_MODEL=base` para uno más ligero) con los part numbers del catálogo como vocabulario, y las
+respuestas a preguntas dictadas se leen con la voz del navegador (`speechSynthesis`; "Responder con voz" en ⋮ lo
+activa siempre). Gratis y sin servicios externos; el audio no sale del equipo.
 
 Búsqueda híbrida con AI Search (requiere `databricks auth login`):
 `ADVISOR_RETRIEVAL_BACKEND=hybrid ADVISOR_DATABRICKS_PROFILE=<perfil> make app` · comparar motores:

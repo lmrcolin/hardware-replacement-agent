@@ -16,6 +16,6 @@ Firmas estables (stubs con `NotImplementedError` hasta que se implementen). Camb
 | compatibility | `derive_requirements(original, query) -> list[TechnicalRequirement]`; `evaluate(original, candidate, reqs) -> CompatibilityResult` |
 | recommendation | `rank(results, products) -> RankedOutput(recommendations, risky_options, unverified_options)` |
 | llm | `LLMClient.complete_json(prompt, schema) -> BaseModel`; `.generate(prompt) -> str` (DatabricksFMAPI, Ollama, Template) |
-| agent | `AdvisorAgent.answer(query: CustomerQuery) -> RecommendationResponse` |
+| agent | `AdvisorAgent.answer(query: CustomerQuery) -> RecommendationResponse` (memoria en `query.context`; herramientas en `agent/knowledge.py`, plan en `agent/planner.py`, ADR-014) |
 | repository | `ArtifactRepository` (LocalParquet, DatabricksSQL): `load_products`, `load_graph`, `load_matrix`, `save_*` |
 | models | todos los Pydantic |

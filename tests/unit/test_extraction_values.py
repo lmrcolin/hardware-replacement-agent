@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from advisor.extraction.values import (
@@ -104,3 +106,11 @@ def test_registry_synonyms_map_to_canonical_keywords() -> None:
     assert measurands.canonical("Humedad") == "humidity"
     assert measurands.canonical("gases volátiles") == "gas"
     assert measurands.canonical("sabor") is None
+
+
+def test_agilex_user_io_is_read_from_the_gpio_line() -> None:
+    from advisor.compatibility.engine import default_registry
+    from advisor.models import Category
+
+    pattern = default_registry().for_category(Category.FPGA)["user_io"].patterns[0]
+    assert re.search(pattern, "GPIO: up to 624 user I/O. Package:").group(1) == "624"  # type: ignore[union-attr]

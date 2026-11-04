@@ -8,6 +8,7 @@ from typing import Literal
 from advisor.compatibility.engine import default_registry
 from advisor.extraction.registry import fold
 from advisor.extraction.values import parse_number
+from advisor.kg.aliases import is_technical_term
 from advisor.models import (
     Category,
     Operator,
@@ -43,10 +44,11 @@ UNIT_TOKEN = re.compile(
 
 # (category or None for any, regex, key, operator, unit, fixed value or None to use group 1)
 _NET, _GPU, _DAQ = Category.NETWORK, Category.GPU, Category.DAQ
-_SPEED = r"(\d+(?:\.\d+)?)\s*(?:gigabit|gbe|gb/s|gbps)\b"
+_SPEED = r"(\d+(?:\.\d+)?)\s*(?:gigabit|gbe|gb/s|gbps|gb|g)\b"  # "25 Gb", "25G" in a NIC query
 _CHANNELS = r"(\d+)\s*(?:canales|entradas|channels|inputs)"
 _RATE = r"(\d+(?:\.\d+)?\s*(?:ms/s|ks/s|msps|ksps))"
 _SRAM = r"(\d+)\s*kb\s*(?:de\s*)?(?:sram|ram)"
+_MCU, _MEM = Category.MICROCONTROLLER, Category.MEMORY
 _PATTERNS: tuple[tuple[Category | None, str, str, Operator, str | None, str | None], ...] = (
     (_NET, _SPEED, "port_speed", Operator.GTE, "Gb/s", None),
     (_NET, r"\brdma\b", "rdma", Operator.HAS, None, "*"),
@@ -56,13 +58,18 @@ _PATTERNS: tuple[tuple[Category | None, str, str, Operator, str | None, str | No
     (_NET, r"\btls\b", "offloads", Operator.HAS, None, "TLS"),
     (_NET, r"\bvxlan\b", "offloads", Operator.HAS, None, "VXLAN"),
     (_NET, r"\bgeneve\b", "offloads", Operator.HAS, None, "GENEVE"),
+    (_NET, r"\bsr-?iov\b", "sriov_vfs", Operator.HAS, None, "*"),
     (_GPU, r"(\d+)\s*gb\b", "memory_size", Operator.GTE, "GB", None),
     (Category.STORAGE, r"(\d+(?:\.\d+)?)\s*tb\b", "capacity", Operator.GTE, "TB", None),
     (_DAQ, _CHANNELS, "analog_inputs", Operator.GTE, "count", None),
     (_DAQ, r"(\d+)\s*-?\s*bits?\b", "resolution", Operator.GTE, "bit", None),
     (_DAQ, _RATE, "sample_rate", Operator.GTE, "S/s", None),
-    (Category.MICROCONTROLLER, _SRAM, "sram", Operator.GTE, "KB", None),
+    (_MCU, _SRAM, "sram", Operator.GTE, "KB", None),
+    (_MCU, r"\busb\b", "usb", Operator.HAS, None, "*"),
+    (_MEM, r"\b(lpddr5x|ddr5|hbm3)\b", "memory_type", Operator.EQ, None, None),
 )
+# Memory density keeps the customer's unit: "16 Gb" (gigabits, DRAM density) ≠ "16 GB".
+_MEM_SIZE = re.compile(r"(\d+(?:\.\d+)?)\s*(Gb|GB|Gbit)\b")
 
 
 def detect_category(text: str) -> Category | None:
@@ -107,6 +114,8 @@ def _requirements(text: str, category: Category | None) -> list[TechnicalRequire
         value: str | float | int
         if fixed is not None:
             value = fixed
+        elif unit is None:
+            value = m.group(1).upper()
         else:
             parsed = parse_number(m.group(1), unit) if unit else None
             if parsed is None:
@@ -125,6 +134,13 @@ def _requirements(text: str, category: Category | None) -> list[TechnicalRequire
                 origin=RequirementOrigin.QUERY,
             )
         )
+    size = _MEM_SIZE.search(text) if category is Category.MEMORY else None
+    if size:
+        unit = "Gb" if size.group(2) in ("Gb", "Gbit") else "GB"
+        found.append(
+            TechnicalRequirement(key="capacity", operator=Operator.GTE, value=float(size.group(1)),
+                                 unit=unit, priority=Priority.MUST, origin=RequirementOrigin.QUERY)
+        )  # fmt: skip
     if category is not None:
         for req in _keyword_requirements(text, category):
             if (req.key, str(req.value)) not in seen:
@@ -138,7 +154,8 @@ def part_tokens(text: str) -> list[str]:
     out: list[str] = []
     for token in re.findall(r"[A-Za-z0-9][A-Za-z0-9-]{2,}", text):
         has_both = re.search(r"[A-Za-z]", token) and re.search(r"\d", token)
-        if has_both and not UNIT_TOKEN.match(token) and token not in out:
+        technical = UNIT_TOKEN.match(token) or is_technical_term(token)
+        if has_both and not technical and token not in out:
             out.append(token)
     return out
 

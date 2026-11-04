@@ -52,7 +52,7 @@ categories:
     dsp_blocks:       {unit: count, type: number, aliases: [dsp]}
     transceivers:     {unit: count, type: number, aliases: [transceivers]}
     transceiver_rate: {unit: Gb/s, type: number, aliases: [speed]}
-    user_io:          {unit: count, type: number, aliases: [io]}
+    user_io:          {unit: count, type: number, aliases: [io], patterns: ['([\d,]+) user I/O']}
     process:          {type: string, derive: false, aliases: [process]}
     package:          {type: string, aliases: [package, package options]}
 
@@ -92,7 +92,7 @@ categories:
 
   Network:
     port_speed:     {unit: Gb/s, type: number, critical: true, aliases: [speed, port speed, port configuration],
-                     upgrade_condition: "Puertos de {candidate} {unit} (original {original} {unit}): validar ópticas/switch o usar breakout"}
+                     upgrade_condition: "Puertos de {candidate} {unit} (se requieren {original} {unit}): validar ópticas/switch o usar breakout"}
     ports:          {unit: count, type: number, aliases: [ports]}
     host_interface: {type: string, critical: true, compare: interface, aliases: [pcie, host interface], patterns: ['(PCIe \d\.\d x\d+) host interface']}
     sriov_vfs:      {unit: count, type: number, aliases: [sriov, sr-iov]}

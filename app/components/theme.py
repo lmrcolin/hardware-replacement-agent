@@ -28,11 +28,30 @@ CSS = f"""
 [data-testid="stMainBlockContainer"] {{ padding-top: 1rem; padding-bottom: 6rem; }}
 
 /* ---- widget header: avatar, name, status, settings, minimize ---- */
+/* Streamlit's own top bar: transparent and click-through (only its buttons react), so it
+   never paints a band over the conversation; the widget header below is the real top bar. */
+header[data-testid="stHeader"] {{ background: transparent; pointer-events: none; }}
+header[data-testid="stHeader"] button, header[data-testid="stHeader"] a {{ pointer-events: auto; }}
+[data-testid="stDecoration"] {{ display: none; }}
+[data-testid="stExpandSidebarButton"] {{ color: #fff; }}
+
+/* The widget header sticks to the top; messages scroll underneath it. The opaque page-colored
+   box keeps text from showing through the curved corners; the teal shape is drawn by ::before. */
+[data-testid="stLayoutWrapper"]:has(> .st-key-widget-head) {{
+  position: sticky; top: 0; z-index: 50; background: {PAGE};
+}}
 .st-key-widget-head {{
+  position: relative; isolation: isolate;
+  background: {PAGE}; padding: 16px 18px 22px 18px; color: #fff; margin-bottom: 10px;
+}}
+.st-key-widget-head::before {{
+  content: ""; position: absolute; inset: 0; z-index: -1;
   background: linear-gradient(120deg, {ACCENT} 0%, {ACCENT_2} 100%);
   border-radius: 18px 18px 50% 50% / 18px 18px 28px 28px;  /* curved bottom edge */
-  padding: 16px 18px 22px 18px; color: #fff; margin-bottom: 10px;
+  box-shadow: 0 6px 14px rgba(15, 118, 110, .18);
 }}
+/* sidebar closed: Streamlit's » button floats at the top-left, over the header; make room */
+.stApp:has([data-testid="stExpandSidebarButton"]) .st-key-widget-head {{ padding-left: 64px; }}
 .st-key-widget-head a, .st-key-widget-head div {{ text-decoration: none; }}
 .head-id {{ display: flex; gap: 12px; align-items: center; }}
 .head-id small {{ opacity: .85; font-size: 12px; }}
@@ -158,6 +177,8 @@ ol.steps li::before {{
   margin: 0 !important; font-size: 11px; line-height: 1.4;
 }}
 [class*="st-key-part-"] [data-testid="stElementContainer"] {{ margin: 0 !important; }}
+
+.st-key-tts {{ position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }}
 
 /* ---- sidebar: history and trends ---- */
 [data-testid="stSidebar"] {{ background: {CARD}; }}

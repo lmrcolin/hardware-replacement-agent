@@ -102,7 +102,8 @@ def speech_text(markdown: str, limit: int = 900) -> str:
 
 
 def speak_html(text: str) -> str:
-    """Snippet for ``st.components.v1.html``: reads ``text`` with a Spanish browser voice."""
+    """HTML for ``st.iframe``: reads ``text`` with a Spanish browser voice. The text is JSON-quoted
+    with ``<`` escaped, so agent/LLM output cannot inject markup into the frame."""
     # json.dumps quotes the text; escaping "<" keeps "</script>" from closing the tag early.
     payload = json.dumps(speech_text(text)).replace("<", r"\u003c")
     return (

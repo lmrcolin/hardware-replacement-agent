@@ -10,6 +10,7 @@ conversation through ``response.context`` (contract 1.2.0); the UI only sends it
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import uuid
 from dataclasses import dataclass, field
@@ -45,7 +46,7 @@ from components.voice import warm_up as voice_warm_up
 from mock_agent import MockAdvisorAgent
 
 from advisor.agent import Advisor, AdvisorAgent
-from advisor.config import LLMChoice
+from advisor.config import LLMChoice, get_settings
 from advisor.models import CommercialStatus, CustomerQuery, RecommendationResponse
 from advisor.pipeline import (
     BuiltArtifacts,
@@ -113,6 +114,9 @@ st.set_page_config(
 )
 st.html(css())
 state = st.session_state
+get_settings()  # loads .env, so ADVISOR_LLM_DEFAULT below sees the local choice
+if "llm" not in state:  # "claude" in a local .env preselects Claude; the team default is our LLM
+    state["llm"] = "claude" if os.environ.get("ADVISOR_LLM_DEFAULT") == "claude" else "ours"
 turns: list[Turn] = state.setdefault("turns", [])
 search_log = SearchLog()
 if voice_installed():
@@ -446,6 +450,7 @@ def run_pending(message: tuple[str, str, bool]) -> None:
     found_by = evidence_sources(agent.retriever) if isinstance(agent, AdvisorAgent) else None
     turn = Turn(shown, sent, response, trace, found_by, voice=by_voice)
     turns.append(turn)
+    state["scroll_to"] = turn.id  # show the new answer from its question, not from the bottom
     search_log.append(search_record(turn.id, shown, sent, response, source=kind))
     st.query_params["k"] = sent
     st.rerun()
@@ -478,6 +483,21 @@ else:
         run_pending(pending)
     asking = bool(turns and turns[-1].response.clarification_question)
     chat_input("Responde a la pregunta del agente…" if asking else PLACEHOLDER)
+
+# Streamlit keeps chat apps scrolled to the bottom; a long answer would then be read from its
+# end. Once per new answer, bring the customer's question to the top of the view instead.
+if (target := state.pop("scroll_to", None)) and turns and turns[-1].id == target:
+    st.html(
+        "<script>(function(){const sel='.st-key-msg-user-" + target + "';"
+        "const go=(smooth)=>{const c=document.querySelector("
+        "'[data-testid=\"stAppScrollToBottomContainer\"]');const e=document.querySelector(sel);"
+        "if(!c||!e){return;}const top=e.getBoundingClientRect().top-c.getBoundingClientRect().top"
+        "+c.scrollTop-72;if(Math.abs(c.scrollTop-top)>4){c.scrollTo({top:top,"
+        "behavior:smooth?'smooth':'auto'});}};"
+        "setTimeout(()=>go(true),150);setTimeout(()=>go(false),900);setTimeout(()=>go(false),1500);"
+        "})();</script>",
+        unsafe_allow_javascript=True,
+    )
 
 # Read the newest answer aloud once: always for dictated questions, or when the toggle is on.
 if turns and state.get("spoken") != turns[-1].id and (turns[-1].voice or state.get("tts")):

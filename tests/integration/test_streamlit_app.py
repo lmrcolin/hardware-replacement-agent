@@ -455,3 +455,9 @@ def test_agent_failure_shows_a_designed_error_with_retry(monkeypatch) -> None:  
         assert not at.exception  # no traceback for the customer
     at.button(key="retry").click().run()
     assert next(s.value for s in at.subheader) == "1. USB-2633"
+
+
+def test_local_env_can_preselect_claude(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("ADVISOR_LLM_DEFAULT", "claude")
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    assert at.selectbox(key="llm").value == "claude"

@@ -21,13 +21,13 @@ from advisor.agent import AdvisorAgent
 from advisor.chunking import chunk_document
 from advisor.commercial import CommercialEngine
 from advisor.compatibility import derive_requirements, evaluate
-from advisor.config import REPO_ROOT, Settings, get_settings
+from advisor.config import REPO_ROOT, LLMChoice, Settings, get_settings
 from advisor.enrichment import join_catalog
 from advisor.extraction import extract_product, load_spec_registry
 from advisor.ingestion import discover_documents
 from advisor.kg import build_graph
 from advisor.kg import save as save_graph
-from advisor.llm import build_llm_chain
+from advisor.llm import build_llm_chain, claude_status
 from advisor.models import (
     Chunk,
     CommercialInformation,
@@ -292,10 +292,18 @@ def evidence_sources(retriever: Retriever) -> str | None:
     return ", ".join(f"{name} {count}" for name, count in sources.items())
 
 
+def llm_status(choice: LLMChoice) -> str:
+    """ "ready" or why the chat's LLM option cannot be used (shown next to the selector)."""
+    return claude_status() if choice == "claude" else "ready"
+
+
 def build_agent(
-    settings: Settings | None = None, artifacts: BuiltArtifacts | None = None
+    settings: Settings | None = None,
+    artifacts: BuiltArtifacts | None = None,
+    llm: LLMChoice = "ours",
 ) -> AdvisorAgent:
-    """Composition root: real AdvisorAgent with the configured LLM chain (template always last)."""
+    """Composition root: real AdvisorAgent with the configured LLM chain (template always last).
+    ``llm``: "ours" (Llama on Databricks / Ollama / templates) or "claude" (API key)."""
     settings = settings or get_settings()
     artifacts = artifacts or load_or_build(settings)
     return AdvisorAgent(
@@ -303,7 +311,7 @@ def build_agent(
         products=artifacts.products,
         commercial=CommercialEngine(artifacts.catalog),
         retriever=build_retriever(settings, artifacts.chunks),
-        llm_chain=build_llm_chain(settings),
+        llm_chain=build_llm_chain(settings, llm),
         registry=load_spec_registry(_resolve(settings.paths.spec_registry)),
     )
 

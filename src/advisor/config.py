@@ -17,7 +17,8 @@ from pydantic import BaseModel, Field
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SETTINGS_PATH = REPO_ROOT / "config" / "settings.yaml"
 
-LLMProviderName = Literal["databricks", "ollama", "template"]
+LLMProviderName = Literal["databricks", "ollama", "claude", "template"]
+LLMChoice = Literal["ours", "claude"]  # chat selector: our LLM chain or the Claude API key
 RepositoryBackend = Literal["local", "databricks_sql"]
 RetrieverBackend = Literal["bm25", "faiss", "hybrid", "ai_search"]
 
@@ -44,6 +45,7 @@ class LLMSettings(BaseModel):
     databricks_endpoint: str = "databricks-meta-llama-3-3-70b-instruct"
     ollama_model: str = "qwen3:4b"
     ollama_host: str = "http://localhost:11434"
+    claude_model: str = "claude-sonnet-5-5"  # used only when the chat selects "Claude (API key)"
     timeout_s: float = 30.0
 
 
@@ -69,6 +71,7 @@ _ENV_OVERRIDES: dict[str, tuple[str, ...]] = {
     "ADVISOR_REPOSITORY_BACKEND": ("repository_backend",),
     "ADVISOR_RETRIEVAL_BACKEND": ("retrieval", "backend"),
     "ADVISOR_OLLAMA_HOST": ("llm", "ollama_host"),
+    "ADVISOR_CLAUDE_MODEL": ("llm", "claude_model"),
     "ADVISOR_PDF_DIR": ("paths", "pdf_dir"),  # p. ej. datos/pdfs (estructura del enunciado)
 }
 

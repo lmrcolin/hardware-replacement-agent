@@ -400,3 +400,12 @@ def test_guard_corrects_an_invalid_llm_plan(built: BuiltArtifacts) -> None:
     assert resp.clarification_question is None
     assert any("corrige a fake-llm" in c.decided_by for c in resp.tool_calls)
     assert resp.tool_calls[0].thought == "preguntar"
+
+
+def test_repeated_question_is_answered_from_cache(built: BuiltArtifacts) -> None:
+    agent = make_agent(built)
+    first = agent.answer(CustomerQuery(text=OFFICIAL))
+    trace = list(agent.last_trace)
+    again = agent.answer(CustomerQuery(text=OFFICIAL))
+    assert again == first and again is not first  # a copy: callers cannot alter the cache
+    assert agent.last_trace == trace

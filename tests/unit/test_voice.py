@@ -71,3 +71,28 @@ def test_speech_reads_plain_text_and_is_safely_embedded() -> None:
     assert json.loads(payload) == voice.speech_text(tricky)
     assert html.count("</script") == 1  # the payload cannot close the script tag
     assert "<" not in payload
+
+
+def test_warm_up_loads_in_the_background_and_reports_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import threading
+    import time
+
+    release = threading.Event()
+
+    def slow_model(name: str) -> object:
+        release.wait(2)
+        return object()
+
+    monkeypatch.setattr(voice, "_model", slow_model)
+    monkeypatch.setattr(voice, "_warmup", {})
+    monkeypatch.setenv(voice.MODEL_ENV, "fake")
+    voice.warm_up()  # returns at once: the chat is never blocked by the download
+    assert voice.status() == "loading"
+    release.set()
+    for _ in range(50):
+        if voice.status() == "ready":
+            break
+        time.sleep(0.02)
+    assert voice.status() == "ready"

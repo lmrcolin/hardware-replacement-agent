@@ -10,6 +10,7 @@ question before it is sent, because the agent itself is stateless per query.
 
 from __future__ import annotations
 
+import logging
 import sys
 import uuid
 from dataclasses import dataclass, field
@@ -17,7 +18,6 @@ from html import escape
 from pathlib import Path
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -38,8 +38,10 @@ from components.render import (
     response_view,
 )
 from components.theme import CSS
-from components.voice import available as voice_available
+from components.voice import available as voice_installed
 from components.voice import message_from, speak_html, transcribe
+from components.voice import status as voice_status
+from components.voice import warm_up as voice_warm_up
 from mock_agent import MockAdvisorAgent
 
 from advisor.agent import Advisor, AdvisorAgent
@@ -52,6 +54,7 @@ from advisor.pipeline import (
     retrieval_status,
 )
 
+log = logging.getLogger("advisor.app")
 REAL, MOCK = "Real (catálogo + datasheets)", "Simulado (fixtures)"
 EXAMPLES = {
     "Caso oficial (Intel E810)": (
@@ -97,6 +100,32 @@ def get_retrieval_status(kind: str) -> str:
 st.set_page_config(page_title="Emerson Replacement Advisor · Agente", page_icon="🤖", layout="wide")
 st.html(CSS)
 state = st.session_state
+if voice_installed():
+    voice_warm_up()  # background download/load: the first dictation does not block the chat
+
+
+def voice_available() -> bool:
+    """The microphone is offered only once the speech model is loaded."""
+    return voice_installed() and voice_status() == "ready"
+
+
+def _voice_pending() -> str:
+    if not voice_installed():
+        return "Para hablarle al agente instala la voz: `uv sync --extra voice`."
+    current = voice_status()
+    if current.startswith("error"):
+        return f"Voz no disponible ({current[7:]}); puedes escribir normalmente."
+    return "Voz: preparando el modelo de reconocimiento (solo la primera vez)…"
+
+
+@st.fragment(run_every="3s")
+def _wait_for_voice() -> None:
+    """Re-render once the speech model finishes loading, so the microphone appears by itself."""
+    if voice_installed() and voice_status() == "ready" and not state.get("voice_shown"):
+        state["voice_shown"] = True
+        st.rerun(scope="app")
+
+
 turns: list[Turn] = state.setdefault("turns", [])
 search_log = SearchLog()
 
@@ -111,6 +140,7 @@ def _transcriber(audio: bytes) -> str:
     try:
         return transcribe(audio, vocabulary=_vocabulary())
     except Exception as exc:  # model download or decoding problems must not break the chat
+        log.exception("voice transcription failed")
         state["voice_error"] = f"No pude transcribir el audio ({str(exc)[:160]})."
         return ""
 
@@ -247,8 +277,15 @@ with st.container(key="widget-head"):
             "Micrófono en el campo de mensaje: transcripción local con faster-whisper; las "
             "respuestas a preguntas dictadas se leen en voz alta."
             if voice_available()
-            else "Para hablarle al agente instala la voz: `uv sync --extra voice`."
+            else _voice_pending()
         )
+        if voice_available():
+            st.caption(
+                "Si al grabar aparece un error de micrófono: abre la app en Chrome o Edge en "
+                "`http://localhost:8501` (el navegador integrado de VS Code y la dirección de red "
+                "`http://<ip>:8501` no permiten micrófono) y elige **Permitir** en el aviso o en "
+                "el candado de la barra de direcciones."
+            )
         st.caption(
             "Cómo decide: estado, precio y stock salen solo del catálogo; la compatibilidad la "
             "deciden reglas deterministas con evidencia; solo recomienda piezas ACTIVE; el LLM "
@@ -354,7 +391,8 @@ for i, turn in enumerate(turns):
 # Read the newest answer aloud once: always for dictated questions, or when the toggle is on.
 if turns and state.get("spoken") != turns[-1].id and (turns[-1].voice or state.get("tts")):
     last = turns[-1].response
-    components.html(speak_html(last.clarification_question or last.message), height=0)
+    with st.container(key="tts"):  # hidden; the script inside only calls speechSynthesis
+        st.iframe(speak_html(last.clarification_question or last.message), height=1)
     state["spoken"] = turns[-1].id
 if state.get("voice_error"):
     st.warning(state.pop("voice_error"))
@@ -364,4 +402,6 @@ placeholder = (
     if turns and turns[-1].response.clarification_question
     else "Escribe tu mensaje…"
 )
+if voice_installed() and not state.get("voice_shown"):
+    _wait_for_voice()
 st.chat_input(placeholder, key="chat", on_submit=ask, accept_audio=voice_available())

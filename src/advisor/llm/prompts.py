@@ -28,7 +28,7 @@ def build_nlu_prompt(text: str, allowed_keys: dict[str, list[str]]) -> str:
     schema = json.dumps(ParsedQuery.model_json_schema(), ensure_ascii=False)
     return (
         "Eres un analizador de consultas de reemplazo de hardware. Devuelve SOLO un JSON válido "
-        "con el esquema indicado.\n"
+        "y compacto con el esquema indicado; omite los campos vacíos o con su valor por defecto.\n"
         "Reglas:\n"
         "- intent: replace (busca sustituto), find (busca producto por requisitos), status "
         "(pregunta estado/precio/stock) u other.\n"
@@ -55,9 +55,12 @@ def extract_query(prompt: str) -> str:
 
 def build_nlg_prompt(draft: str) -> str:
     return (
-        "Reescribe el borrador en español claro y profesional para un cliente industrial. "
-        "Conserva el orden de las recomendaciones. NO añadas, cambies ni redondees cifras, "
-        "precios, unidades ni part numbers; no añadas productos ni afirmaciones técnicas que no "
+        "Reescribe el borrador en español claro y profesional para un cliente industrial, en "
+        "máximo 110 palabras: la interfaz ya muestra tarjetas con todos los detalles, así que "
+        "resume lo esencial (estado de la pieza, opción recomendada con precio y unidades, la "
+        "condición principal). Conserva el orden de las recomendaciones. NO añadas, cambies ni "
+        "redondees cifras, precios, unidades ni part numbers; no añadas productos ni "
+        "afirmaciones técnicas que no "
         "estén en el borrador. Devuelve solo el texto final.\n"
         f"{DRAFT_OPEN}\n{draft}\n{DRAFT_CLOSE}"
     )
@@ -76,7 +79,8 @@ def build_planner_prompt(situation: str, tools: dict[str, str], schema: dict[str
         "tú no decides compatibilidad, precios ni stock, solo el plan.\n"
         f"Herramientas:\n{catalog}\n"
         "Reglas: usa solo part numbers que aparezcan en la situación; termina con finish; "
-        "máximo 6 pasos; si el cliente busca sustituto, identifica la pieza y busca sustitutos; "
+        "máximo 6 pasos; thought = una frase de máximo 20 palabras; si el cliente busca "
+        "sustituto, identifica la pieza y busca sustitutos; "
         "si no hay resultados, intenta relax_requirements; si pregunta algo técnico usa "
         "ask_datasheets; si pide comparar usa compare; si falta información usa ask_customer.\n"
         "Devuelve SOLO un JSON con este esquema: "

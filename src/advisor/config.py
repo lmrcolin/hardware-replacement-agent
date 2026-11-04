@@ -45,7 +45,7 @@ class LLMSettings(BaseModel):
     databricks_endpoint: str = "databricks-meta-llama-3-3-70b-instruct"
     ollama_model: str = "qwen3:4b"
     ollama_host: str = "http://localhost:11434"
-    claude_model: str = "claude-sonnet-5-5"  # used only when the chat selects "Claude (API key)"
+    claude_model: str = "claude-haiku-5-5"  # chat option "Claude (API key)"; Sonnet 5.5 to step up
     timeout_s: float = 30.0
 
 

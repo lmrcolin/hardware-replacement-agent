@@ -96,6 +96,14 @@ En Databricks: Query History del warehouse, peticiones del serving endpoint de L
 La barra lateral guarda el **historial y las más buscadas** (últimos 7 días, en
 `.cache/advisor/searches.jsonl`, ignorado por git; `ADVISOR_SEARCH_LOG` lo cambia).
 
+**Claude (opcional, de pago).** El selector **Modelo de lenguaje** del chat ofrece "Nuestro LLM" (Llama en
+Databricks → Ollama → plantillas) o "Claude (API key)": `src/advisor/llm/claude.py` con el SDK oficial (extra
+`claude`, que `make app` instala) y `ANTHROPIC_API_KEY` en `.env` (nunca en el repo). Modelo por defecto
+`claude-haiku-5-5` con esfuerzo bajo (`ADVISOR_CLAUDE_MODEL=claude-sonnet-5-5` para subir); en el golden set iguala
+a Sonnet 5.5 y Opus 5.5 en todas las métricas y puertas, a ~US$ 0,0008 por consulta. Solo interpreta (JSON validado)
+y redacta con reglas de brevedad (verificado por VERIFY); la compatibilidad la deciden las reglas. Si falla o
+rechaza, responde con plantillas. `ADVISOR_LLM_DEFAULT=claude` en tu `.env` preselecciona Claude.
+
 **Voz.** `make app` instala el extra `voice`: el campo de mensaje tiene micrófono, la transcripción es local con
 [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (modelo `small`, ~460 MB la primera vez;
 `ADVISOR_WHISPER_MODEL=base` para uno más ligero) con los part numbers del catálogo como vocabulario, y las

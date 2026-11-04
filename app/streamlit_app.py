@@ -13,6 +13,7 @@ question before it is sent, because the agent itself is stateless per query.
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import uuid
 from dataclasses import dataclass, field
@@ -503,9 +504,12 @@ placeholder = (
     else "Escribe tu mensaje…"
 )
 with st.container(key="llm-choice", horizontal=True, vertical_alignment="center"):
+    # ADVISOR_LLM_DEFAULT=claude (local .env) preselects Claude; the team default stays "ours".
+    default_llm = os.environ.get("ADVISOR_LLM_DEFAULT", "ours")
     st.selectbox(
         "Modelo de lenguaje",
         list(LLM_LABEL),
+        index=list(LLM_LABEL).index(default_llm) if default_llm in LLM_LABEL else 0,
         key="llm",
         format_func=LLM_LABEL.__getitem__,
         help="Solo cambia quién interpreta, planea y redacta. La compatibilidad, el precio y el "

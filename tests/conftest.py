@@ -10,6 +10,7 @@ from pathlib import Path
 # settings load, because load_dotenv(override=False) keeps values that are already set.
 os.environ["ADVISOR_LLM_PROVIDERS"] = "template"
 os.environ["ANTHROPIC_API_KEY"] = ""
+os.environ["ADVISOR_LLM_DEFAULT"] = "ours"
 
 import networkx as nx
 import pytest

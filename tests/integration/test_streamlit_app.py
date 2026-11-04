@@ -21,6 +21,14 @@ OFFICIAL = (
 REAL = "Real (catálogo + datasheets)"
 
 
+@pytest.fixture(autouse=True)
+def _isolated_search_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Never write the real history: every test gets its own search log."""
+    log = tmp_path / "searches.jsonl"
+    monkeypatch.setenv("ADVISOR_SEARCH_LOG", str(log))
+    return log
+
+
 def _component(name: str) -> ModuleType:
     sys.path.insert(0, str(APP_DIR))
     module = __import__(f"components.{name}", fromlist=[name])
@@ -99,7 +107,7 @@ def test_example_and_part_shortcuts_start_new_questions() -> None:
 
 def test_new_conversation_clears_the_chat() -> None:
     at = ask("Necesito reemplazar la USB-2627")
-    at.sidebar.button[0].click().run()
+    at.button(key="new-chat").click().run()
     assert len(at.chat_message) == 1 and not at.subheader
 
 
@@ -116,9 +124,9 @@ def test_unknown_candidates_have_their_own_section() -> None:
     assert [s.value for s in at.subheader] == ["1. w9-3595X"]
 
 
-def test_sidebar_lists_the_agent_tools() -> None:
+def test_settings_menu_lists_the_agent_tools() -> None:
     at = AppTest.from_file(str(APP), default_timeout=120).run()
-    tools = " ".join(m.value for m in at.sidebar.markdown)
+    tools = markdown(at)
     for tool in ("Catálogo comercial", "Grafo de conocimiento", "Búsqueda documental"):
         assert tool in tools
     assert "Motor de compatibilidad" in tools and "Modelo de lenguaje" in tools
@@ -229,4 +237,81 @@ def test_shared_link_opens_once_and_does_not_replay() -> None:
     assert [t.shown for t in at.session_state["turns"]] == [
         "Necesito reemplazar la USB-2627",
         "Busco una GPU de 80GB",
+    ]
+
+
+# ---------------------------------------------------------------- history, trends, rating
+
+
+def test_searches_are_logged_and_trend_in_the_sidebar(_isolated_search_log: Path) -> None:
+    at = ask("Necesito reemplazar la USB-2627")
+    chat(at, "Necesito reemplazar la E810-CQDA2")
+    chat(at, "Reemplazo para la Intel E810-CQDA2")
+    rows = [
+        json.loads(line) for line in _isolated_search_log.read_text(encoding="utf-8").splitlines()
+    ]
+    assert [r["part"] for r in rows] == ["USB-2627", "E810-CQDA2", "E810-CQDA2"]
+    assert {r["outcome"] for r in rows} == {"recommended"}
+    at = AppTest.from_file(str(APP), default_timeout=120).run()  # a new session sees the history
+    trends = [b.label for b in at.sidebar.button if b.key and b.key.startswith("trend-ask-")]
+    assert trends[:2] == ["E810-CQDA2", "USB-2627"]  # grouped by resolved part, most searched first
+    at.button(key="trend-ask-0").click().run()
+    assert next(s.value for s in at.subheader) == "1. MCX75310AAS-NEAT"
+
+
+def test_minimize_hides_the_conversation() -> None:
+    at = ask("Necesito reemplazar la USB-2627")
+    at.button(key="minimize").click().run()
+    assert not at.chat_input and not at.subheader
+    at.button(key="minimize").click().run()
+    assert at.chat_input and at.subheader
+
+
+def test_history_helpers(tmp_path: Path) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    history = _component("history")
+    now = datetime(2026, 11, 3, tzinfo=UTC)
+
+    def row(days_ago: float, text: str, part: str | None, category: str | None = None) -> dict:  # type: ignore[type-arg]
+        ts = (now - timedelta(days=days_ago)).isoformat()
+        return {
+            "type": "search",
+            "ts": ts,
+            "text": text,
+            "sent": text,
+            "part": part,
+            "category": category,
+        }
+
+    rows = [
+        row(10, "Necesito reemplazar la A100", "A100-SXM4-80GB"),
+        row(9, "Necesito reemplazar la A100", "A100-SXM4-80GB"),
+        row(3, "Necesito reemplazar la A100", "A100-SXM4-80GB"),
+        row(2, "Intel E810", "E810-CQDA2"),
+        row(1, "e810 por favor", "E810-CQDA2"),
+        row(0.5, "Busco una GPU de 80GB", None, "GPU"),
+        {"type": "feedback", "id": "a", "useful": True},
+        "not json",
+    ]
+    trends = history.trending([r for r in rows if isinstance(r, dict)], now=now)
+    assert [(t.topic, t.total, t.previous, t.direction) for t in trends] == [
+        ("E810-CQDA2", 2, 0, "up"),
+        ("A100-SXM4-80GB", 1, 2, "down"),
+        ("GPU", 1, 0, "up"),
+    ]
+    log = history.SearchLog(tmp_path / "log.jsonl")
+    for r in rows[:6]:
+        log.append(r)
+    log.path.open("a", encoding="utf-8").write("{broken\n")
+    log.rate("t1", useful=True)
+    log.rate("t2", useful=False)
+    log.rate("t2", useful=True)  # latest rating wins
+    read = log.read()
+    assert len(read) == 9  # the broken line is skipped
+    assert history.satisfaction(read) == (2, 2)
+    assert [r["text"] for r in history.recent(read, limit=3)] == [
+        "Busco una GPU de 80GB",
+        "e810 por favor",
+        "Intel E810",
     ]

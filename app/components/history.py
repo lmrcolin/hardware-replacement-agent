@@ -3,8 +3,9 @@
 Every question sent to the agent is appended to a local JSON Lines log (default
 ``.cache/advisor/searches.jsonl``, git-ignored; override with ``ADVISOR_SEARCH_LOG``). Ratings
 ("¿Te fue útil?") go to the same file. Trends group searches by the part the agent resolved, or by
-category when it searched by requirements, so "E810", "Intel E810" and "E810-CQDA2" count as one.
-Presentation only: nothing here feeds the agent.
+category when it searched by requirements, so "E810", "Intel E810" and "E810-CQDA2" count as one;
+questions where the agent recognised neither (greetings, microphone tests, typos it had to ask
+about) stay in the recent list but do not rank. Presentation only: nothing here feeds the agent.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ OUTCOME_LABEL = {
     "none": "sin sustituto",
     "clarify": "pidió aclaración",
 }
+MONTHS = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
 
 
 def log_path() -> Path:
@@ -86,6 +88,11 @@ class SearchLog:
             }
         )
 
+    def clear(self) -> None:
+        """Start an empty history; the previous log is kept as ``<name>.bak`` (one level undo)."""
+        if self.path.is_file():
+            self.path.replace(self.path.with_name(self.path.name + ".bak"))
+
     def read(self) -> list[dict[str, Any]]:
         if not self.path.is_file():
             return []
@@ -105,6 +112,40 @@ def searches(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
 def topic(record: dict[str, Any]) -> str:
     """What the search was about: resolved part > category > the text itself."""
     return str(record.get("part") or record.get("category") or record["text"]).strip()
+
+
+def identified(record: dict[str, Any]) -> bool:
+    """The agent recognised a part or a category, so the search has a topic worth ranking."""
+    return bool(record.get("part") or record.get("category"))
+
+
+def _timestamp(record: dict[str, Any]) -> datetime | None:
+    try:
+        ts = datetime.fromisoformat(record["ts"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return ts if ts.tzinfo else ts.replace(tzinfo=UTC)
+
+
+def relative_time(ts: str, now: datetime | None = None) -> str:
+    """'hace 5 min', 'hace 3 h', 'ayer', 'hace 4 días' or the date ('12 oct') for older ones."""
+    when = _timestamp({"ts": ts})
+    if when is None:
+        return ""
+    now = now or datetime.now(UTC)
+    seconds = (now - when).total_seconds()
+    if seconds < 60:
+        return "hace un momento"
+    if seconds < 3600:
+        return f"hace {int(seconds // 60)} min"
+    if seconds < 86400:
+        return f"hace {int(seconds // 3600)} h"
+    if seconds < 2 * 86400:
+        return "ayer"
+    if seconds < 7 * 86400:
+        return f"hace {int(seconds // 86400)} días"
+    year = "" if when.year == now.year else f" {when.year}"
+    return f"{when.day} {MONTHS[when.month - 1]}{year}"
 
 
 def recent(rows: Iterable[dict[str, Any]], limit: int = 6) -> list[dict[str, Any]]:
@@ -127,14 +168,29 @@ class Trend:
     total: int  # searches in the window
     previous: int  # searches in the window before it
     example: str  # latest question about this topic (to re-ask it)
+    is_part: bool = True  # topic is a part number (False: a category searched by requirements)
+    category: str | None = None  # catalog category logged with the latest search
 
     @property
     def direction(self) -> str:
+        if self.previous == 0:
+            return "new"
         if self.total > self.previous:
             return "up"
         if self.total < self.previous:
             return "down"
         return "flat"
+
+    @property
+    def change(self) -> str:
+        """The comparison with the previous window, in words."""
+        if self.direction == "new":
+            return "nueva esta semana"
+        if self.direction == "flat":
+            return "igual que la semana previa"
+        diff = self.total - self.previous
+        sign = "+" if diff > 0 else "\u2212"  # typographic minus
+        return f"{sign}{abs(diff)} vs. semana previa"
 
 
 def trending(
@@ -144,25 +200,50 @@ def trending(
     days: int = 7,
     limit: int = 5,
 ) -> list[Trend]:
-    """Most searched topics in the last ``days``, compared with the ``days`` before."""
+    """Most searched parts or categories in the last ``days``, compared with the ``days`` before.
+
+    Searches where the agent recognised neither a part nor a category are left out (see
+    ``unidentified``).
+    """
     now = now or datetime.now(UTC)
     start, before = now - timedelta(days=days), now - timedelta(days=2 * days)
     current: Counter[str] = Counter()
     previous: Counter[str] = Counter()
-    example: dict[str, str] = {}
+    latest: dict[str, dict[str, Any]] = {}
     for record in searches(rows):
-        try:
-            ts = datetime.fromisoformat(record["ts"])
-        except (KeyError, ValueError):
+        ts = _timestamp(record)
+        if ts is None or not identified(record):
             continue
         name = topic(record)
         if ts >= start:
             current[name] += 1
-            example[name] = record["sent"] if record.get("sent") else record["text"]
+            latest[name] = record
         elif ts >= before:
             previous[name] += 1
     ranked = sorted(current.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]
-    return [Trend(name, count, previous[name], example[name]) for name, count in ranked]
+    return [
+        Trend(
+            name,
+            count,
+            previous[name],
+            latest[name].get("sent") or latest[name]["text"],
+            is_part=bool(latest[name].get("part")),
+            category=latest[name].get("category"),
+        )
+        for name, count in ranked
+    ]
+
+
+def unidentified(
+    rows: Iterable[dict[str, Any]], *, now: datetime | None = None, days: int = 7
+) -> int:
+    """Searches in the last ``days`` without a recognised part or category (not ranked)."""
+    start = (now or datetime.now(UTC)) - timedelta(days=days)
+    return sum(
+        1
+        for record in searches(rows)
+        if not identified(record) and (ts := _timestamp(record)) is not None and ts >= start
+    )
 
 
 def satisfaction(rows: Iterable[dict[str, Any]]) -> tuple[int, int]:

@@ -45,11 +45,13 @@ from components.voice import warm_up as voice_warm_up
 from mock_agent import MockAdvisorAgent
 
 from advisor.agent import Advisor, AdvisorAgent
+from advisor.config import LLMChoice
 from advisor.models import CommercialStatus, CustomerQuery, RecommendationResponse
 from advisor.pipeline import (
     BuiltArtifacts,
     build_agent,
     evidence_sources,
+    llm_status,
     load_or_build,
     retrieval_status,
 )
@@ -86,9 +88,19 @@ def get_artifacts() -> BuiltArtifacts:
     return load_or_build()
 
 
+LLM_LABEL = {"ours": "Nuestro LLM (Llama 3.3 en Databricks)", "claude": "Claude (API key)"}
+
+
 @st.cache_resource
-def get_agent(kind: str) -> Advisor:
-    return MockAdvisorAgent() if kind == MOCK else build_agent(artifacts=get_artifacts())
+def get_agent(kind: str, llm: LLMChoice = "ours") -> Advisor:
+    """One agent per data source and LLM option (each keeps its own answer cache)."""
+    if kind == MOCK:
+        return MockAdvisorAgent()
+    return build_agent(artifacts=get_artifacts(), llm=llm)
+
+
+def chosen_llm() -> LLMChoice:
+    return "claude" if state.get("llm") == "claude" else "ours"
 
 
 @st.cache_resource(show_spinner="Comprobando la búsqueda documental…")
@@ -249,7 +261,7 @@ with st.container(key="widget-head"):
             "Nueva conversación", key="new-chat", on_click=new_conversation,
             icon=":material/add_comment:",
         )  # fmt: skip
-        agent = get_agent(kind)
+        agent = get_agent(kind, chosen_llm())
         st.markdown("**Herramientas del agente**")
         if isinstance(agent, AdvisorAgent):
             artifacts = get_artifacts()
@@ -297,7 +309,7 @@ with st.container(key="widget-head"):
         help="Minimizar el chat" if not minimized else "Abrir el chat",
     )  # fmt: skip
 
-agent = get_agent(kind)
+agent = get_agent(kind, chosen_llm())
 names = get_artifacts().document_names if kind == REAL else {}
 known_parts = [p.part_number for p in get_artifacts().products] if kind == REAL else []
 
@@ -402,6 +414,19 @@ placeholder = (
     if turns and turns[-1].response.clarification_question
     else "Escribe tu mensaje…"
 )
+with st.container(key="llm-choice", horizontal=True, vertical_alignment="center"):
+    st.selectbox(
+        "Modelo de lenguaje",
+        list(LLM_LABEL),
+        key="llm",
+        format_func=LLM_LABEL.__getitem__,
+        help="Solo cambia quién interpreta, planea y redacta. La compatibilidad, el precio y el "
+        "stock los deciden siempre las herramientas deterministas y el catálogo.",
+        width=320,
+    )
+    status = llm_status(chosen_llm())
+    if status != "ready":
+        st.caption(f"Claude no está listo ({status}): se responde con plantillas.")
 if voice_installed() and not state.get("voice_shown"):
     _wait_for_voice()
 st.chat_input(placeholder, key="chat", on_submit=ask, accept_audio=voice_available())

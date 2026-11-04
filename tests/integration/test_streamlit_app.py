@@ -58,10 +58,12 @@ def markdown(at: AppTest) -> str:
 def test_official_case_shows_reasoning_answer_and_ranked_substitutes() -> None:
     at = ask(OFFICIAL)
     assert [s.value for s in at.subheader][:2] == ["1. MCX75310AAS-NEAT", "2. BCM57508"]
-    assert "Pieza original: E810-CQDA2" in markdown(at) and "DISCONTINUED" in markdown(at)
-    assert len(at.dataframe) == 2  # spec comparison per recommendation
-    status = [s for s in at.status if s.label.startswith("Razonamiento del agente")]
-    assert len(status) == 1
+    page = markdown(at)
+    assert "Pieza original" in page and ">E810-CQDA2<" in page and ">Descontinuada<" in page
+    assert page.count('<table class="specs">') == 2  # spec comparison per recommendation
+    assert 'title="El fabricante dejó de producirla' in page  # badges explain themselves
+    reasoning = [e for e in at.expander if e.label.startswith("Cómo lo resolvió el agente")]
+    assert len(reasoning) == 1
     steps = markdown(at)
     for key in ("PARSE", "RESOLVE", "STATUS", "DISCOVER", "VALIDATE", "RANK", "COMPOSE", "VERIFY"):
         assert f'<span class="step-key">{key}</span>' in steps
@@ -70,7 +72,7 @@ def test_official_case_shows_reasoning_answer_and_ranked_substitutes() -> None:
 
 def test_clarification_offers_options_and_keeps_context() -> None:
     at = ask("Reemplazo para la E81O-CQDA2")
-    assert any("E810-CQDA2" in i.value for i in at.info)
+    assert '<div class="ask">' in markdown(at) and "E810-CQDA2" in markdown(at)
     assert not at.subheader
     assert "Responde a la pregunta del agente" in at.chat_input(key="chat").placeholder
     option = "E810-CQDA2"
@@ -102,7 +104,7 @@ def test_example_and_part_shortcuts_start_new_questions() -> None:
     assert not at.exception
     assert next(s.value for s in at.subheader) == "1. USB-2633"
     chat(at, "Busco una GPU de 80GB")
-    assert len(at.chat_message) == 5  # greeting + two questions + two answers
+    assert len(at.session_state["turns"]) == 2
     at = AppTest.from_file(str(APP), default_timeout=120).run()
     part = "E810-CQDA2"
     at.button(key=f"pick-{part}").click().run()
@@ -112,7 +114,8 @@ def test_example_and_part_shortcuts_start_new_questions() -> None:
 def test_new_conversation_clears_the_chat() -> None:
     at = ask("Necesito reemplazar la USB-2627")
     at.button(key="new-chat").click().run()
-    assert len(at.chat_message) == 1 and not at.subheader
+    assert not at.session_state["turns"] and not at.subheader
+    assert "¿Qué pieza necesitas reemplazar?" in markdown(at)  # back to the home screen
 
 
 def test_mock_agent_still_available() -> None:
@@ -226,10 +229,10 @@ def test_real_photo_replaces_the_illustration(tmp_path: Path, monkeypatch) -> No
 
 def test_images_show_in_shortcuts_and_answers() -> None:
     at = AppTest.from_file(str(APP), default_timeout=120).run()
-    assert markdown(at).count('class="pimg pimg-mini"') == 11
+    assert markdown(at).count('<div class="thumb"><div class="pimg">') == 11  # catalog cards
     chat(at, OFFICIAL)
     # original + 2 recommended substitutes
-    assert markdown(at).count('<div class="pimg"><img src="data:image/svg+xml') == 3
+    assert markdown(at).count('<div class="thumb"><div class="pimg"><img src="data:image/svg') == 3
 
 
 def test_shared_link_opens_once_and_does_not_replay() -> None:
@@ -263,12 +266,23 @@ def test_searches_are_logged_and_trend_in_the_sidebar(_isolated_search_log: Path
     assert next(s.value for s in at.subheader) == "1. MCX75310AAS-NEAT"
 
 
-def test_minimize_hides_the_conversation() -> None:
-    at = ask("Necesito reemplazar la USB-2627")
-    at.button(key="minimize").click().run()
-    assert not at.chat_input and not at.subheader
-    at.button(key="minimize").click().run()
-    assert at.chat_input and at.subheader
+def test_settings_panel_holds_the_technical_options() -> None:
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    assert at.selectbox(key="llm").value == "ours"  # model choice lives in Ajustes, not the chat
+    assert at.toggle(key="tts").value is False
+    assert at.radio(key="agent").value.startswith("Real")
+
+
+def test_catalog_filters_by_status_and_text() -> None:
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    at.segmented_control(key="catalog-status").set_value("NRND").run()
+    assert {b.key for b in at.button if b.key and b.key.startswith("pick-")} == {
+        "pick-Cortex-A78", "pick-XC7A200T", "pick-A100-SXM4-80GB",
+    }  # fmt: skip
+    at.text_input(key="catalog-q").set_value("nvidia").run()
+    assert [b.key for b in at.button if b.key and b.key.startswith("pick-")] == [
+        "pick-A100-SXM4-80GB"
+    ]
 
 
 def test_history_helpers(tmp_path: Path) -> None:
@@ -299,16 +313,10 @@ def test_history_helpers(tmp_path: Path) -> None:
         "not json",
     ]
     trends = history.trending([r for r in rows if isinstance(r, dict)], now=now)
-    assert [(t.topic, t.total, t.previous, t.direction, t.is_part) for t in trends] == [
-        ("E810-CQDA2", 2, 0, "new", True),
-        ("A100-SXM4-80GB", 1, 2, "down", True),
-        ("GPU", 1, 0, "new", False),
-    ]
-    assert [t.change for t in trends] == [
-        "nueva esta semana",
-        "\u22121 vs. semana previa",
-        "nueva esta semana",
-    ]
+    assert [(t.topic, t.total, t.previous, t.direction) for t in trends] == [
+        ("E810-CQDA2", 2, 0, "new"),
+        ("A100-SXM4-80GB", 1, 2, "down"),
+    ]  # only real part numbers trend; a search by category is not a trend
     log = history.SearchLog(tmp_path / "log.jsonl")
     for r in rows[:6]:
         log.append(r)
@@ -319,11 +327,16 @@ def test_history_helpers(tmp_path: Path) -> None:
     read = log.read()
     assert len(read) == 9  # the broken line is skipped
     assert history.satisfaction(read) == (2, 2)
-    assert [r["text"] for r in history.recent(read, limit=3)] == [
-        "Busco una GPU de 80GB",
-        "e810 por favor",
-        "Intel E810",
+    latest = history.recent(read, limit=3)
+    assert [history.title(r) for r in latest] == [
+        "Buscar GPU",
+        "Reemplazo de E810-CQDA2",  # "Intel E810" is the same search: one entry
+        "Reemplazo de A100-SXM4-80GB",
     ]
+    assert history.relative_time(latest[0]["ts"], now=now) == "hace 12 h"
+    assert history.title({"text": "  ¿necesito algo para medir la presión del aire hoy?"}) == (
+        "Necesito algo para medir la presión"
+    )
 
 
 def test_history_time_unidentified_and_clear(tmp_path: Path) -> None:
@@ -387,7 +400,7 @@ def test_history_time_unidentified_and_clear(tmp_path: Path) -> None:
     assert len(history.SearchLog(tmp_path / "log.jsonl.bak").read()) == 4  # one level of undo
 
 
-def test_sidebar_explains_topics_results_and_can_be_cleared(_isolated_search_log: Path) -> None:
+def test_sidebar_lists_recent_and_trending_and_can_be_cleared(_isolated_search_log: Path) -> None:
     from datetime import UTC, datetime, timedelta
 
     now = datetime.now(UTC)
@@ -400,42 +413,45 @@ def test_sidebar_explains_topics_results_and_can_be_cleared(_isolated_search_log
         "".join(
             json.dumps(
                 {
-                    "type": "search",
-                    "id": f"t{i}",
-                    "text": text,
-                    "sent": text,
-                    "part": part,
-                    "category": cat,
-                    "outcome": result,
-                    "source": REAL,
+                    "type": "search", "id": f"t{i}", "text": text, "sent": text, "part": part,
+                    "category": cat, "outcome": result, "source": REAL,
                     "ts": (now - timedelta(minutes=minutes)).isoformat(),
                 }
             )
             + "\n"
             for i, (text, part, cat, result, minutes) in enumerate(seeded)
-        )
-        + json.dumps({"type": "feedback", "id": "t0", "useful": True})
-        + "\n",
+        ),
         encoding="utf-8",
-    )
+    )  # fmt: skip
     at = AppTest.from_file(str(APP), default_timeout=120).run()
     assert not at.exception
     labels = {b.key: b.label for b in at.sidebar.button}
-    assert labels["trend-ask-0"] == "E810-CQDA2"
-    assert labels["trend-ask-1"] == "GPU"  # category searched by requirements, in Spanish
-    assert labels["recent-0"] == "Hola, hola, uno, dos, tres, probando"
+    assert labels["trend-ask-0"] == "E810-CQDA2" and "trend-ask-1" not in labels  # parts only
+    assert [labels[f"recent-{i}"] for i in range(3)] == [
+        "Hola, hola, uno, dos, tres, probando",  # first words, never cut mid-word
+        "Buscar GPU",
+        "Reemplazo de E810-CQDA2",
+    ]
     side = " ".join(m.value for m in at.sidebar.markdown)
-    # what the part is and its status come from the catalog (source of truth)
-    assert "Intel E810 100GbE" in side and "DISCONTINUED" in side
-    assert "Categoría · búsqueda por requisitos" in side
-    assert "nueva esta semana" in side
-    assert "hace 30 min" in side and "con sustituto" in side and "pidió aclaración" in side
-    assert "1 de 1 respuestas valoradas fueron útiles" in side
-    notes = " ".join(c.value for c in at.sidebar.caption)
-    assert "1 consulta sin pieza ni categoría" in notes  # the greeting does not rank
+    assert "hace 30 min · con sustituto" in side and "1 consulta esta semana" in side
+    assert "vs." not in side  # no "vs. 7 días previos" noise
     at.button(key="history-clear").click().run()
     assert not at.exception
     assert not [b for b in at.sidebar.button if b.key and b.key.startswith(("trend-", "recent-"))]
-    notes = " ".join(c.value for c in at.sidebar.caption)
-    assert "Aún no hay búsquedas esta semana" in notes and "Tus consultas aparecerán aquí" in notes
     assert _isolated_search_log.with_name(_isolated_search_log.name + ".bak").is_file()
+
+
+def test_agent_failure_shows_a_designed_error_with_retry(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from advisor.agent import AdvisorAgent
+
+    def boom(self, query):  # type: ignore[no-untyped-def]
+        raise RuntimeError("catálogo caído")
+
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    with monkeypatch.context() as patch:
+        patch.setattr(AdvisorAgent, "answer", boom)
+        chat(at, "Necesito reemplazar la USB-2627")
+        assert "No pude completar la consulta" in markdown(at)
+        assert not at.exception  # no traceback for the customer
+    at.button(key="retry").click().run()
+    assert next(s.value for s in at.subheader) == "1. USB-2633"

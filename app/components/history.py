@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -62,6 +63,7 @@ def search_record(
         "sent": sent,
         "part": response.original.part_number if response.original else None,
         "category": parsed.category.value if parsed and parsed.category else None,
+        "intent": parsed.intent if parsed else None,
         "outcome": outcome(response),
         "source": source,
     }
@@ -114,6 +116,29 @@ def topic(record: dict[str, Any]) -> str:
     return str(record.get("part") or record.get("category") or record["text"]).strip()
 
 
+CATEGORY_TITLE = {
+    "Network": "tarjeta de red", "GPU": "GPU", "CPU": "CPU", "DAQ": "DAQ", "FPGA": "FPGA",
+    "Memory": "memoria", "Microcontroller": "microcontrolador", "Storage": "almacenamiento",
+    "Power": "fuente de poder", "Sensor": "sensor",
+}  # fmt: skip
+
+
+def title(record: dict[str, Any]) -> str:
+    """Short, readable title for a search (never the raw query cut in half)."""
+    part, category, intent = record.get("part"), record.get("category"), record.get("intent")
+    if part and intent == "question":
+        return f"Pregunta sobre {part}"
+    if intent == "compare":
+        return f"Comparación con {part}" if part else "Comparación de productos"
+    if part:
+        return f"Reemplazo de {part}"
+    if category:
+        return f"Buscar {CATEGORY_TITLE.get(category, category.lower())}"
+    words = re.sub(r"\s+", " ", str(record.get("text", ""))).strip(" .?¿!¡").split(" ")
+    text = " ".join(words[:6]).rstrip(" ,;:")
+    return (text[:1].upper() + text[1:]) if text else "Consulta"
+
+
 def identified(record: dict[str, Any]) -> bool:
     """The agent recognised a part or a category, so the search has a topic worth ranking."""
     return bool(record.get("part") or record.get("category"))
@@ -149,11 +174,11 @@ def relative_time(ts: str, now: datetime | None = None) -> str:
 
 
 def recent(rows: Iterable[dict[str, Any]], limit: int = 6) -> list[dict[str, Any]]:
-    """Latest distinct questions, newest first."""
+    """Latest distinct searches (by title), newest first."""
     seen: set[str] = set()
     out: list[dict[str, Any]] = []
     for record in reversed(searches(rows)):
-        key = record["text"].casefold()
+        key = title(record).casefold()
         if key not in seen:
             seen.add(key)
             out.append(record)
@@ -212,7 +237,8 @@ def trending(
     latest: dict[str, dict[str, Any]] = {}
     for record in searches(rows):
         ts = _timestamp(record)
-        if ts is None or not identified(record):
+        # trends list real part numbers only (a category or a raw phrase is not a trend)
+        if ts is None or not record.get("part"):
             continue
         name = topic(record)
         if ts >= start:

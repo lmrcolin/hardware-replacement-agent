@@ -19,7 +19,7 @@ from advisor.models import (
     Category,
     CommercialInformation,
     CommercialStatus,
-    CompatibilityLevel,
+    Evidence,
     Product,
     Recommendation,
     RecommendationResponse,
@@ -27,19 +27,8 @@ from advisor.models import (
     TechnicalRequirement,
 )
 from components.images import image_html
+from components.theme import level_badge, status_badge
 
-LEVEL_BADGE = {
-    CompatibilityLevel.COMPATIBLE: ":green-badge[Compatible]",
-    CompatibilityLevel.COMPATIBLE_WITH_CONDITIONS: ":orange-badge[Compatible con condiciones]",
-    CompatibilityLevel.UNKNOWN: ":gray-badge[No confirmada: faltan datos críticos]",
-    CompatibilityLevel.INCOMPATIBLE: ":red-badge[Incompatible]",
-}
-STATUS_BADGE = {
-    CommercialStatus.ACTIVE: ":green-badge[ACTIVE]",
-    CommercialStatus.NRND: ":orange-badge[NRND · no recomendado para nuevos diseños]",
-    CommercialStatus.DISCONTINUED: ":red-badge[DISCONTINUED]",
-    CommercialStatus.EOL: ":red-badge[EOL · fin de vida]",
-}
 OUTCOME_LABEL = {
     RuleOutcome.PASS: "✓ cumple",
     RuleOutcome.CONDITIONAL: "◐ con condición",
@@ -98,7 +87,9 @@ TOOL_LABEL = {
 def _decider(name: str) -> str:
     if name.startswith("rules"):
         return "reglas" + name[5:]
-    return {"databricks": "Llama 3.3 (Databricks)", "ollama": "Ollama"}.get(name, name)
+    labels = {"databricks": "Llama 3.3", "ollama": "Ollama", "template": "plantillas",
+              "claude": "Claude", "rules": "reglas"}  # fmt: skip
+    return labels.get(name, name)
 
 
 def _html(markup: str) -> None:
@@ -234,30 +225,28 @@ def reasoning(
 
 
 def reasoning_view(steps: Sequence[Step], response: RecommendationResponse) -> None:
+    """A quiet, collapsible line: what the agent did, who planned it, and every internal step."""
     nlu, nlg = providers(response)
-    llm = nlu if nlu == nlg else f"{nlu} → {nlg}"
-    calls = response.tool_calls
+    llm = _decider(nlu) if nlu == nlg else f"{_decider(nlu)} → {_decider(nlg)}"
+    calls = [c for c in response.tool_calls if c.tool != "finish"]
     planner = next((c.decided_by for c in calls if not c.decided_by.startswith("rules")), "rules")
-    label = (
-        f"Razonamiento del agente · {len(calls)} acciones · plan: {_decider(planner)} · LLM: {llm}"
-        if calls
-        else f"Razonamiento del agente · {len(steps)} pasos · LLM: {llm}"
-    )
-    with st.status(label, state="complete", expanded=False):
+    count = f"{len(calls)} acciones" if calls else f"{len(steps)} pasos"
+    with st.expander(f"Cómo lo resolvió el agente · {count} · plan: {_decider(planner)}"):
         if calls:
-            thought = next((c.thought for c in calls if c.thought), None)
+            thought = next((c.thought for c in response.tool_calls if c.thought), None)
             if thought:
                 st.caption(f"Plan propuesto por {_decider(planner)}: “{thought}”")
             items = "".join(
-                f"<li><b>{escape(TOOL_LABEL.get(c.tool, c.tool))}</b> "
+                f"<li><b>{escape(TOOL_LABEL.get(c.tool, c.tool))}</b>"
                 f'<span class="step-key">{escape(_decider(c.decided_by))}</span>'
                 f'<div class="step-detail">{escape(c.summary)}</div></li>'
                 for c in calls
             )
             _html(f'<ol class="steps">{items}</ol>')
-            st.caption("Detalle de cada paso interno:")
+        st.caption(f"Modelo de lenguaje: {llm} · solo interpreta, planea y redacta.")
         items = "".join(
-            f'<li><span class="step-key">{escape(s.key)}</span> <b>{escape(s.title)}</b>'
+            f"<li><b>{escape(s.title)}</b>"
+            f'<span class="step-key">{escape(s.key)}</span>'
             f'<div class="step-detail">{escape(s.detail)}</div></li>'
             for s in steps
         )
@@ -278,29 +267,66 @@ def clarification_options(question: str | None, known: Iterable[str]) -> list[st
 
 # ---------------------------------------------------------------- result cards
 
+OUTCOME_MARK = {
+    RuleOutcome.PASS: ("ok", "✓ Cumple"),
+    RuleOutcome.CONDITIONAL: ("cond", "◐ Con condición"),
+    RuleOutcome.FAIL: ("fail", "✕ No cumple"),
+    RuleOutcome.MISSING: ("miss", "— Sin dato"),
+}
+
+
+def thumb_html(product: Product) -> str:
+    return f'<div class="thumb">{image_html(product)}</div>'
+
+
+def card_head_html(product: Product, eyebrow: str, badge_html: str, detail: str) -> str:
+    return (
+        f'<div class="card-head">{thumb_html(product)}<div class="who">'
+        f'<div class="eyebrow">{escape(eyebrow)}</div>'
+        f'<div class="pn">{escape(product.part_number)}</div>'
+        f'<div class="desc">{escape(detail)}</div></div>{badge_html}</div>'
+    )
+
 
 def original_card(product: Product, *, key: str = "original") -> None:
     c = product.commercial
     with st.container(key=f"card-{key}"):
-        left, right = st.columns([1, 5], gap="small")
-        left.markdown(image_html(product), unsafe_allow_html=True)
-        with right:
-            st.markdown(f"**Pieza original: {product.part_number}**")
-            if c is None:
-                st.caption("Sin información comercial en el catálogo.")
-                return
-            st.markdown(f"{STATUS_BADGE[c.status]} · {c.description} · {c.manufacturer}")
-            since = c.discontinued_on.isoformat() if c.discontinued_on else "—"
-            last = c.last_buy_on.isoformat() if c.last_buy_on else "—"
-            label = "NRND desde" if c.status is CommercialStatus.NRND else "Descontinuada desde"
-            st.caption(
-                f"{CATEGORY_LABEL[c.category]} · {label}: {since} · última compra: {last} · "
-                f"stock: {stock_text(c)}"
-            )
+        if c is None:
+            _html(card_head_html(product, "Pieza original", "", "Sin información comercial."))
+            return
+        since = c.discontinued_on.isoformat() if c.discontinued_on else None
+        last = c.last_buy_on.isoformat() if c.last_buy_on else None
+        bits = [f"{c.description} · {c.manufacturer}"]
+        if since:
+            bits.append(f"desde {since}")
+        if last:
+            bits.append(f"última compra {last}")
+        _html(card_head_html(product, "Pieza original", status_badge(c.status), " · ".join(bits)))
+
+
+def comparison_html(rec: Recommendation) -> str:
+    """Original (or required) vs candidate per evaluated rule, straight from the engine."""
+    rows = []
+    for rule in rec.compatibility.rule_results:
+        req = rule.requirement
+        unit = (req.unit if req and req.unit not in (None, "count") else "") or ""
+        css, mark = OUTCOME_MARK[rule.outcome]
+        rows.append(
+            f'<tr><td class="key">{escape(req.key if req else "categoría")}</td>'
+            f"<td>{escape(_fmt(rule.original_value))} {escape(unit)}</td>"
+            f"<td>{escape(_fmt(rule.candidate_value))} {escape(unit)}</td>"
+            f'<td class="{css}">{mark}</td></tr>'
+        )
+    return (
+        '<table class="specs"><thead><tr><th>Especificación</th><th>Original / requerido</th>'
+        "<th>Sustituto</th><th>Resultado</th></tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table>"
+    )
 
 
 def comparison_table(rec: Recommendation) -> pd.DataFrame:
-    """Original vs candidate per evaluated requirement, straight from the engine's RuleResults."""
+    """Same comparison as a table (kept for exports and tests)."""
     rows = []
     for rule in rec.compatibility.rule_results:
         req = rule.requirement
@@ -319,47 +345,51 @@ def comparison_table(rec: Recommendation) -> pd.DataFrame:
 
 
 def facts_html(c: CommercialInformation, coverage: float) -> str:
-    """Catalog facts as wrapping chips (never squeezed into a narrow column)."""
-    chips = [
+    """Catalog facts in tabular figures (the catalog is the source of truth)."""
+    facts = [
         ("Precio (catálogo)", price_text(c)),
         ("Stock", stock_text(c)),
         ("Requisitos obligatorios", f"{coverage:.0%} cubiertos"),
-        ("Estado", c.status.value),
     ]
     return (
         '<div class="facts">'
-        + "".join(f"<span><small>{escape(k)}</small><b>{escape(v)}</b></span>" for k, v in chips)
+        + "".join(f"<div><small>{escape(k)}</small><b>{escape(v)}</b></div>" for k, v in facts)
         + "</div>"
+    )
+
+
+def citations_html(evidence: Sequence[Evidence], names: dict[str, str]) -> str:
+    return "".join(
+        f'<div class="cite"><b>{escape(names.get(ev.document_id, ev.document_id[:12]))} · '
+        f"página {ev.page}</b>“{escape(ev.quote)}”</div>"
+        for ev in evidence
     )
 
 
 def recommendation_card(rec: Recommendation, names: dict[str, str], *, key: str) -> None:
     c = rec.commercial
     with st.container(key=f"card-{key}"):
-        left, body = st.columns([1, 5], gap="small")
-        left.markdown(image_html(rec.product), unsafe_allow_html=True)
-        with body:
-            st.subheader(f"{rec.rank}. {rec.product.part_number}", anchor=False)
-            st.markdown(
-                f"{LEVEL_BADGE[rec.compatibility.level]} · {c.description} · {c.manufacturer}"
+        st.subheader(f"{rec.rank}. {rec.product.part_number}", anchor=False)
+        _html(
+            card_head_html(
+                rec.product, f"Opción {rec.rank}", level_badge(rec.compatibility.level),
+                f"{c.description} · {c.manufacturer}",
             )
-            _html(facts_html(c, rec.compatibility.coverage))
-        st.write(rec.rationale)
+        )  # fmt: skip
+        _html(facts_html(c, rec.compatibility.coverage))
+        why = f'<div class="why">{escape(rec.rationale)}'
         if rec.compatibility.conditions:
-            st.markdown(
-                "**Condiciones**\n" + "\n".join(f"- {x}" for x in rec.compatibility.conditions)
+            why += (
+                "<ul>"
+                + "".join(f"<li>{escape(x)}</li>" for x in rec.compatibility.conditions)
+                + "</ul>"
             )
-        compare, evidence = st.tabs(
-            ["Comparación de especificaciones", f"Evidencia ({len(rec.evidence)} citas)"]
-        )
-        with compare:
-            st.dataframe(comparison_table(rec), hide_index=True, width="stretch")
-        with evidence:
-            if not rec.evidence:
-                st.caption("Sin citas para este candidato.")
-            for ev in rec.evidence:
-                source = names.get(ev.document_id, ev.document_id[:12])
-                st.caption(f"{source} · p.{ev.page} — “{ev.quote}”")
+        _html(why + "</div>")
+        with st.expander("Comparación de especificaciones"):
+            _html(comparison_html(rec))
+        if rec.evidence:
+            with st.expander(f"Evidencia de los datasheets · {len(rec.evidence)}"):
+                _html(citations_html(rec.evidence, names))
 
 
 def sales_potential(recommendations: Sequence[Recommendation]) -> tuple[int, Decimal]:
@@ -391,30 +421,35 @@ def expert_summary(response: RecommendationResponse) -> str:
     return "\n".join(lines)
 
 
+def _message_html(text: str) -> str:
+    return (
+        '<div class="answer-text">'
+        + "<br>".join(escape(line) for line in text.split("\n"))
+        + "</div>"
+    )
+
+
 def response_view(response: RecommendationResponse, names: dict[str, str], *, turn: int) -> None:
     """The agent's answer: its message first, then the structured result it is based on."""
     if response.is_synthetic:
-        st.warning("Respuesta generada con datos sintéticos de prueba.")
+        st.caption("Respuesta generada con datos sintéticos de prueba.")
     if response.clarification_question:
         # The agent may list what is for sale (vague query) before asking; show it.
         if "\n" in response.message:
             st.markdown(response.message.replace("\n", "  \n"))
-        st.info(response.clarification_question)
+        _html(f'<div class="ask">{escape(response.clarification_question)}</div>')
         return
     st.markdown(response.message.replace("\n", "  \n"))
     if response.original is not None:
         original_card(response.original, key=f"{turn}-original")
     if response.recommendations:
-        title = "Sustitutos recomendados" if response.original else "Productos que cumplen"
-        st.markdown(f"##### {title}")
         for rec in response.recommendations:
             recommendation_card(rec, names, key=f"{turn}-rec-{rec.rank}")
         units, value = sales_potential(response.recommendations)
         if units:
-            st.caption(
-                f"Impacto comercial: {units:,} unidades ACTIVE disponibles en estas opciones, "
-                f"{value:,.2f} USD a precio de catálogo (precio por stock): la venta no se pierde "
-                "por la pieza descontinuada."
+            _html(
+                f'<div class="impact">Impacto comercial: {units:,} unidades disponibles en estas '
+                f"opciones · {value:,.2f} USD a precio de catálogo.</div>"
             )
     open_caveats = not response.recommendations
     if response.risky_options:
@@ -422,7 +457,7 @@ def response_view(response: RecommendationResponse, names: dict[str, str], *, tu
             f"Opciones con riesgo (NRND) · {len(response.risky_options)}", expanded=open_caveats
         ):
             st.caption(
-                "Siguen en inventario pero no se recomiendan para nuevos diseños; "
+                "Siguen en inventario pero no se recomiendan para diseños nuevos; "
                 "sin precio de venta vigente."
             )
             for rec in response.risky_options:
@@ -448,17 +483,15 @@ def response_view(response: RecommendationResponse, names: dict[str, str], *, tu
                 "el requisito indicado. Confírmalo antes de comprar."
             )
             for i, relaxation in enumerate(response.relaxations):
-                st.markdown(f"**Sin {_requirement(relaxation.dropped)}:**")
+                st.markdown(f"**Sin {_requirement(relaxation.dropped)}**")
                 recommendation_card(relaxation.option, names, key=f"{turn}-relax-{i}")
     if response.citations:
         with st.expander(f"Fuentes citadas · {len(response.citations)}"):
-            for ev in response.citations:
-                source = names.get(ev.document_id, ev.document_id[:12])
-                st.caption(f"{source} · p.{ev.page} — “{ev.quote}”")
-    for warning in response.warnings:
-        st.caption(f"Aviso: {warning}")
-    with st.expander("Escalar a un experto"):
-        st.caption(
-            "Copia este resumen y compártelo con el experto (no se envía nada automáticamente)."
-        )
+            _html(citations_html(response.citations, names))
+    with st.expander("Notas y escalar a un experto"):
+        if response.warnings:
+            _html(
+                '<div class="notes">' + "<br>".join(escape(w) for w in response.warnings) + "</div>"
+            )
+        st.caption("Copia este resumen para un experto (no se envía nada automáticamente).")
         st.code(expert_summary(response), language=None)

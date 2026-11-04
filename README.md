@@ -87,14 +87,17 @@ Si el workspace tiene más de un SQL warehouse: `ADVISOR_DATABRICKS_WAREHOUSE_ID
 de AI Search (Free Edition permite uno): `databricks bundle run run_all -t dev --params ai_search=false`; la app
 degrada a BM25 y lo indica.
 
-Cómo comprobar que se usa Databricks: menú **⋮ → Herramientas del agente** muestra el origen real de los datos
+Cómo comprobar que se usa Databricks: **Ajustes (engrane) → Detalles técnicos** muestra el origen real de los datos
 (`Databricks en vivo: emerson_hw.gold.* vía SQL warehouse …`), el estado comprobado de AI Search y la cadena de LLM;
-cada respuesta indica qué motor aportó la evidencia (`bm25 N, ai_search N`) y quién redactó (`databricks` = Llama).
+cada respuesta, en "Cómo lo resolvió el agente", muestra el plan, quién lo decidió y qué modelo redactó.
 En Databricks: Query History del warehouse, peticiones del serving endpoint de Llama, métricas del endpoint
 `emerson-vs` y `system.billing.usage`.
 
-La barra lateral guarda el **historial y las más buscadas** (últimos 7 días, en
-`.cache/advisor/searches.jsonl`, ignorado por git; `ADVISOR_SEARCH_LOG` lo cambia).
+**Interfaz.** Encabezado con Nueva conversación y Ajustes (modelo de lenguaje, fuente de datos, voz, detalles
+técnicos); inicio con el catálogo de piezas a reemplazar (filtro por estado y búsqueda); modo claro y oscuro según
+el sistema. Diseño en `app/static/design.css` (tokens) y `.streamlit/config.toml`. La barra lateral guarda
+**Recientes** y **Tendencias** (solo part numbers; últimos 7 días, en `.cache/advisor/searches.jsonl`, ignorado por
+git; `ADVISOR_SEARCH_LOG` lo cambia).
 
 **Claude (opcional, de pago).** El selector **Modelo de lenguaje** del chat ofrece "Nuestro LLM" (Llama en
 Databricks → Ollama → plantillas) o "Claude (API key)": `src/advisor/llm/claude.py` con el SDK oficial (extra
@@ -105,10 +108,10 @@ y redacta con reglas de brevedad (verificado por VERIFY); la compatibilidad la d
 rechaza, responde con plantillas. `ADVISOR_LLM_DEFAULT=claude` en tu `.env` preselecciona Claude.
 
 **Voz.** `make app` instala el extra `voice`: el campo de mensaje tiene micrófono, la transcripción es local con
-[faster-whisper](https://github.com/SYSTRAN/faster-whisper) (modelo `small`, ~460 MB la primera vez;
-`ADVISOR_WHISPER_MODEL=base` para uno más ligero) con los part numbers del catálogo como vocabulario, y las
-respuestas a preguntas dictadas se leen con la voz del navegador (`speechSynthesis`; "Responder con voz" en ⋮ lo
-activa siempre). Gratis y sin servicios externos; el audio no sale del equipo.
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper) (modelo `base`, ~145 MB, se precarga en segundo plano la
+primera vez; `ADVISOR_WHISPER_MODEL=small` para más precisión) con los part numbers del catálogo como vocabulario, y las
+respuestas a preguntas dictadas se leen con la voz del navegador (`speechSynthesis`; "Leer las respuestas en voz alta" en
+Ajustes lo activa siempre). Gratis y sin servicios externos; el audio no sale del equipo.
 
 Búsqueda híbrida con AI Search (requiere `databricks auth login`):
 `ADVISOR_RETRIEVAL_BACKEND=hybrid ADVISOR_DATABRICKS_PROFILE=<perfil> make app` · comparar motores:

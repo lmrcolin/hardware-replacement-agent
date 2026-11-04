@@ -241,9 +241,9 @@ def clarification_options(question: str | None, known: Iterable[str]) -> list[st
 # ---------------------------------------------------------------- result cards
 
 
-def original_card(product: Product) -> None:
+def original_card(product: Product, *, key: str = "original") -> None:
     c = product.commercial
-    with st.container(key="card-original"):
+    with st.container(key=f"card-{key}"):
         left, right = st.columns([1, 6])
         left.markdown(image_html(product), unsafe_allow_html=True)
         with right:
@@ -343,7 +343,7 @@ def response_view(response: RecommendationResponse, names: dict[str, str], *, tu
         return
     st.markdown(response.message.replace("\n", "  \n"))
     if response.original is not None:
-        original_card(response.original)
+        original_card(response.original, key=f"{turn}-original")
     if response.recommendations:
         title = "Sustitutos recomendados" if response.original else "Productos que cumplen"
         st.markdown(f"##### {title}")

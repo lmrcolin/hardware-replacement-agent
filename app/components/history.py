@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -60,6 +61,7 @@ def search_record(
         "sent": sent,
         "part": response.original.part_number if response.original else None,
         "category": parsed.category.value if parsed and parsed.category else None,
+        "intent": parsed.intent if parsed else None,
         "outcome": outcome(response),
         "source": source,
     }
@@ -107,12 +109,56 @@ def topic(record: dict[str, Any]) -> str:
     return str(record.get("part") or record.get("category") or record["text"]).strip()
 
 
+CATEGORY_TITLE = {
+    "Network": "tarjeta de red", "GPU": "GPU", "CPU": "CPU", "DAQ": "DAQ", "FPGA": "FPGA",
+    "Memory": "memoria", "Microcontroller": "microcontrolador", "Storage": "almacenamiento",
+    "Power": "fuente de poder", "Sensor": "sensor",
+}  # fmt: skip
+
+
+def title(record: dict[str, Any]) -> str:
+    """Short, readable title for a search (never the raw query cut in half)."""
+    part, category, intent = record.get("part"), record.get("category"), record.get("intent")
+    if part and intent == "question":
+        return f"Pregunta sobre {part}"
+    if intent == "compare":
+        return f"Comparación con {part}" if part else "Comparación de productos"
+    if part:
+        return f"Reemplazo de {part}"
+    if category:
+        return f"Buscar {CATEGORY_TITLE.get(category, category.lower())}"
+    words = re.sub(r"\s+", " ", str(record.get("text", ""))).strip(" .?¿!¡").split(" ")
+    text = " ".join(words[:6])
+    return (text[:1].upper() + text[1:]) if text else "Consulta"
+
+
+def relative(ts: str, now: datetime | None = None) -> str:
+    """'hace 5 min', 'ayer', '3 nov'… (Spanish, compact)."""
+    try:
+        when = datetime.fromisoformat(ts)
+    except ValueError:
+        return ""
+    seconds = ((now or datetime.now(UTC)) - when).total_seconds()
+    if seconds < 60:
+        return "ahora"
+    if seconds < 3600:
+        return f"hace {int(seconds // 60)} min"
+    if seconds < 86400:
+        return f"hace {int(seconds // 3600)} h"
+    if seconds < 2 * 86400:
+        return "ayer"
+    if seconds < 7 * 86400:
+        return f"hace {int(seconds // 86400)} días"
+    months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+    return f"{when.day} {months[when.month - 1]}"
+
+
 def recent(rows: Iterable[dict[str, Any]], limit: int = 6) -> list[dict[str, Any]]:
-    """Latest distinct questions, newest first."""
+    """Latest distinct searches (by title), newest first."""
     seen: set[str] = set()
     out: list[dict[str, Any]] = []
     for record in reversed(searches(rows)):
-        key = record["text"].casefold()
+        key = title(record).casefold()
         if key not in seen:
             seen.add(key)
             out.append(record)
@@ -151,6 +197,8 @@ def trending(
     previous: Counter[str] = Counter()
     example: dict[str, str] = {}
     for record in searches(rows):
+        if not record.get("part"):  # trends list real part numbers only, never raw phrases
+            continue
         try:
             ts = datetime.fromisoformat(record["ts"])
         except (KeyError, ValueError):

@@ -1,15 +1,34 @@
-# Tema del agente: neutro y sobrio; el acento verde azulado identifica al agente.
-# Colores de componentes propios en app/components/theme.py.
+# Tema del agente (claro y oscuro según el sistema). Tokens y componentes: app/static/design.css.
 [theme]
-base = "light"
-primaryColor = "#0F766E"
-backgroundColor = "#F6F8FA"
-secondaryBackgroundColor = "#FFFFFF"
-textColor = "#1F2933"
-linkColor = "#0F766E"
-borderColor = "#DDE3E8"
-baseRadius = "medium"
-showWidgetBorder = true
+baseRadius = "10px"
+showWidgetBorder = false
+showSidebarBorder = false
+font = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, 'Segoe UI', system-ui, sans-serif"
+baseFontSize = 15
+
+[theme.light]
+primaryColor = "#0A7E77"
+backgroundColor = "#FBFBFD"
+secondaryBackgroundColor = "#F2F2F5"
+textColor = "#1D1D1F"
+linkColor = "#0A7E77"
+borderColor = "#E5E5EA"
+
+[theme.light.sidebar]
+backgroundColor = "#F5F5F7"
+secondaryBackgroundColor = "#EBEBEF"
+
+[theme.dark]
+primaryColor = "#3CC9BC"
+backgroundColor = "#1C1C1E"
+secondaryBackgroundColor = "#2C2C2E"
+textColor = "#F5F5F7"
+linkColor = "#3CC9BC"
+borderColor = "#3A3A3C"
+
+[theme.dark.sidebar]
+backgroundColor = "#161618"
+secondaryBackgroundColor = "#2C2C2E"
 
 [client]
 toolbarMode = "minimal"

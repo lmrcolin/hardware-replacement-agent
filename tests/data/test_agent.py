@@ -259,3 +259,53 @@ def test_llm_values_are_mapped_to_the_registry_vocabulary(built: BuiltArtifacts)
     values = sorted(r.value for r in resp.parsed_query.requirements)  # type: ignore[union-attr, type-var]
     assert values == ["gas", "humidity"]
     assert any("sabor" in w for w in resp.warnings)  # unknown value dropped, never guessed
+
+
+def ask(built: BuiltArtifacts, text: str):  # type: ignore[no-untyped-def]
+    return make_agent(built).answer(CustomerQuery(text=text))
+
+
+def test_no_substitute_explains_the_discarded_candidates(built: BuiltArtifacts) -> None:
+    resp = ask(built, "Necesito reemplazar la WUS4C6464DSP3X5")
+    assert resp.recommendations == []
+    assert "Candidatos evaluados y descartados" in resp.message
+    assert "MZ-V9P2T0" in resp.message and "M.2 ≠ U.2" in resp.message
+
+
+def test_active_part_is_not_reported_as_missing_a_substitute(built: BuiltArtifacts) -> None:
+    resp = ask(built, "¿Cuánto cuesta la MCX75310AAS-NEAT?")
+    assert "no necesita sustituto" in resp.message
+    assert "No hay un sustituto" not in resp.message and "descartados" not in resp.message
+
+
+def test_manufacturer_and_pin_compatibility_constraints_are_honored(built: BuiltArtifacts) -> None:
+    resp = ask(built, "Reemplazo para XC7A200T, debe ser de Xilinx/AMD y pin compatible")
+    assert resp.recommendations == []  # the only ACTIVE FPGAs are Intel and Lattice
+    assert "fabricante Intel; se pidió Xilinx/AMD" in resp.message
+    assert any(
+        r.key == "package" and r.priority.value == "MUST" for r in resp.parsed_query.requirements
+    )
+
+
+def test_cheap_request_orders_same_level_options_by_price(built: BuiltArtifacts) -> None:
+    resp = ask(built, "NIC de 25 Gb con SR-IOV, la más barata")
+    assert [r.product.part_number for r in resp.recommendations] == ["BCM57508", "MCX75310AAS-NEAT"]
+    assert [r.rank for r in resp.recommendations] == [1, 2]
+
+
+def test_vague_category_query_lists_active_options_while_asking(built: BuiltArtifacts) -> None:
+    resp = ask(built, "dame la mejor GPU barata")
+    assert resp.clarification_question
+    assert resp.message.index("RTX-4090") < resp.message.index("H100-SXM5")  # cheapest first
+
+
+def test_standards_are_requirements_not_part_numbers(built: BuiltArtifacts) -> None:
+    resp = ask(built, "necesito una memoria DDR5 de 16 Gb")
+    assert resp.original is None and resp.parsed_query.part_numbers == []
+    assert [r.product.part_number for r in resp.recommendations] == ["MT60B4G8HB-48B"]
+
+
+def test_truncated_part_number_is_suggested_not_assumed(built: BuiltArtifacts) -> None:
+    resp = ask(built, "Reemplazo para WUS4C6464")
+    assert resp.original is None
+    assert resp.clarification_question and "WUS4C6464DSP3X5" in resp.clarification_question

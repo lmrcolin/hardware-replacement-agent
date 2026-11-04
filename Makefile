@@ -1,5 +1,6 @@
 UV ?= uv
-PROFILE ?= emerson
+# Perfil del Databricks CLI; vacío = perfil por defecto de `databricks auth login`.
+PROFILE ?=
 
 .PHONY: help setup install check lint format imports typecheck test test-contracts pipeline-local eval eval-blind eval-databricks app app-databricks excel clean
 
@@ -8,7 +9,7 @@ help:
 
 setup: ## Create .venv (Python 3.12), install deps and git hooks
 	$(UV) sync
-	$(UV) run pre-commit install
+	@if [ -d .git ]; then $(UV) run pre-commit install; else echo "sin .git: se omiten los hooks"; fi
 
 install: setup ## Alias of setup
 
@@ -50,7 +51,7 @@ app: ## Streamlit chat UI over the real agent (artifacts/ or in-memory build)
 DATABRICKS_ENV = ADVISOR_DATABRICKS_PROFILE=$(PROFILE) ADVISOR_REPOSITORY_BACKEND=databricks_sql \
 	ADVISOR_RETRIEVAL_BACKEND=hybrid ADVISOR_LLM_PROVIDERS=databricks,template
 
-app-databricks: ## Chat UI fully on Databricks: Delta tables, AI Search, Llama (PROFILE=lmrcolin)
+app-databricks: ## Chat UI fully on Databricks: Delta tables, AI Search, Llama (PROFILE=<perfil> opcional)
 	$(DATABRICKS_ENV) $(UV) run streamlit run app/streamlit_app.py
 
 eval-databricks: ## Evaluation fully on Databricks (Delta + hybrid search + Llama), no report rewrite

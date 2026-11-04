@@ -65,26 +65,70 @@ def _recommendation_line(rec: Recommendation) -> str:
     return line
 
 
+def fail_reasons(result: CompatibilityResult, limit: int = 2) -> list[str]:
+    """Why a candidate was rejected: critical failures first."""
+    fails = [r for r in result.rule_results if r.outcome is RuleOutcome.FAIL]
+    critical = [r.message for r in fails if r.severity is Severity.CRITICAL]
+    return (critical or [r.message for r in fails])[:limit]
+
+
+def _price_note(recommendations: Sequence[Recommendation]) -> str | None:
+    """Cheapest viable option when it is not already the first one (price never decides fit)."""
+    priced = [r for r in recommendations if r.commercial.price_usd is not None]
+    if len(priced) < 2 or recommendations[0].commercial.price_usd is None:
+        return None
+    cheapest = min(priced, key=lambda r: r.commercial.price_usd or Decimal(0))
+    if cheapest is recommendations[0]:
+        return None
+    # Only catalog figures: a computed difference would not be traceable to a source (VERIFY).
+    return (
+        f"La opción más económica es {cheapest.product.part_number} "
+        f"({money(cheapest.commercial.price_usd)}); el orden lo decide la compatibilidad, "
+        "no el precio."
+    )
+
+
 def draft_message(
     original: Product | None,
     recommendations: Sequence[Recommendation],
     risky: Sequence[Recommendation],
     blocked_successors: Mapping[str, CompatibilityResult],
     unverified: Sequence[Recommendation] = (),
+    rejected: Sequence[tuple[str, str, Sequence[str]]] = (),
 ) -> str:
+    """Deterministic answer. ``rejected`` = (part number, description, reasons) of discarded
+    candidates, shown when nothing is recommended so the customer sees why."""
     lines: list[str] = []
+    active = (
+        original is not None
+        and original.commercial is not None
+        and original.commercial.status is CommercialStatus.ACTIVE
+    )
     if original is not None:
         lines.append(describe_status(original))
+    if active:
+        lines.append("Está disponible: no necesita sustituto.")
     if recommendations:
-        lines.append(
-            "Sustitutos activos recomendados:"
-            if original
-            else "Productos activos que cumplen la consulta:"
-        )
+        if active:
+            header = "Alternativas compatibles en el catálogo:"
+        elif original:
+            header = "Sustitutos activos recomendados:"
+        else:
+            header = "Productos activos que cumplen la consulta:"
+        lines.append(header)
         lines.extend(_recommendation_line(r) for r in recommendations)
-    else:
+        note = _price_note(recommendations)
+        if note:
+            lines.append(note)
+    elif not active:
         lines.append(
             "No hay un sustituto ACTIVE compatible en el catálogo con la evidencia disponible."
+        )
+    if rejected and not recommendations and not active:
+        lines.append("Candidatos evaluados y descartados:")
+        lines.extend(
+            f"- {part} — {description}: {'; '.join(reasons)}."
+            for part, description, reasons in rejected
         )
     if risky:
         lines.append("Opciones con riesgo (NRND, sin precio de venta vigente):")
@@ -100,9 +144,7 @@ def draft_message(
                 f"{', '.join(rec.compatibility.missing) or 'requisitos críticos'}."
             )
     for successor, result in blocked_successors.items():
-        fails = [r for r in result.rule_results if r.outcome is RuleOutcome.FAIL]
-        critical = [r.message for r in fails if r.severity is Severity.CRITICAL]
-        reasons = (critical or [r.message for r in fails])[:2]
+        reasons = fail_reasons(result)
         lines.append(
             f"El datasheet indica {successor} como sucesor, pero no es un reemplazo directo: "
             + "; ".join(reasons)

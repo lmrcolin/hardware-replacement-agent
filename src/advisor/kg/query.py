@@ -9,7 +9,13 @@ from typing import Literal
 import networkx as nx
 from rapidfuzz import fuzz
 
-from advisor.kg.aliases import alias_map, find_mentions, normalize_part, part_root
+from advisor.kg.aliases import (
+    alias_map,
+    find_mentions,
+    is_technical_term,
+    normalize_part,
+    part_root,
+)
 from advisor.models import CandidateProduct, DiscoveryPath, EdgeType, NodeType, PartMatch
 
 MatchMethod = Literal["exact", "normalized", "fuzzy", "kg"]
@@ -31,6 +37,7 @@ def _products(graph: nx.MultiDiGraph) -> dict[str, dict[str, object]]:
     }
 
 
+PREFIX_SCORE = 0.7  # below the agent's confidence threshold: suggest, don't act
 _QUANTITY = re.compile(r"^\d+(?:\.\d+)?[A-Z/]+$")
 
 
@@ -43,7 +50,8 @@ def _description_aliases(parts: dict[str, dict[str, object]]) -> dict[str, str]:
         for token in re.findall(r"[A-Za-z0-9][A-Za-z0-9-]{2,}", description):
             upper = token.upper()
             has_both = re.search(r"[A-Z]", upper) and re.search(r"\d", upper)
-            if has_both and len(upper) >= 4 and not _QUANTITY.match(upper):
+            technical = _QUANTITY.match(upper) or is_technical_term(upper)
+            if has_both and len(upper) >= 4 and not technical:
                 owners[upper].add(part)
     return {token: next(iter(ps)) for token, ps in owners.items() if len(ps) == 1}
 
@@ -80,6 +88,11 @@ def resolve_part(graph: nx.MultiDiGraph, text: str, *, limit: int = 5) -> list[P
         ratio = max((fuzz.ratio(tok, tgt) for tok in tokens for tgt in targets), default=0.0)
         if ratio >= FUZZY_MIN:
             offer(part, 0.85 * ratio / 100, "fuzzy")
+    # A truncated part number ("WUS4C6464") is offered back as a suggestion, never assumed.
+    for tok in tokens:
+        prefixed = [p for p in parts if len(tok) >= 5 and normalize_part(p).startswith(tok)]
+        if len(prefixed) == 1:
+            offer(prefixed[0], PREFIX_SCORE, "fuzzy")
     return sorted(best.values(), key=lambda m: (-m.score, m.part_number))[:limit]
 
 

@@ -1,6 +1,6 @@
 # Evaluación — Emerson Replacement Advisor
 
-Generado por `make eval` el 2026-11-03 · LLM: `template` · retriever: `bm25` · 32 casos de `evaluation/gold_set.yaml` (verificados contra los PDFs).
+Generado por `make eval` el 2026-11-04 · LLM: `template` · retriever: `bm25` · 32 casos de `evaluation/gold_set.yaml` (verificados contra los PDFs).
 
 **Puertas de seguridad:** OK (todas en 0)
 

@@ -8,6 +8,17 @@ precio, stock, condiciones de instalación y **citas a datasheet y página**.
 > Intel E810 pero ya no la encuentro"* → E810-CQDA2 está DISCONTINUED; 1. **MCX75310AAS-NEAT** (1,250.00 USD, 120 u.),
 > 2. **BCM57508** (890.00 USD, 75 u.), ambos *compatibles con condiciones* (más velocidad: ópticas/switch o breakout).
 
+## Por qué importa (obsoleto → sustituto → venta)
+
+Cuando un cliente pide una pieza que ya no se vende, la venta se pierde salvo que alguien encuentre a tiempo un
+sustituto activo, compatible y en stock; hoy eso depende de expertos. El catálogo tiene 11 piezas no vendibles
+(6 DISCONTINUED, 2 EOL, 3 NRND) frente a 21 ACTIVE con 12,814,325.00 USD de inventario a precio de catálogo
+(precio × stock), y la meta es mover ~4 M USD/año. El asistente convierte cada consulta por una pieza obsoleta
+en una oferta vendible en segundos: sustituto ACTIVE, precio, unidades disponibles, condiciones de instalación y
+evidencia citada; cuando no hay sustituto lo dice y explica qué se descartó y por qué (evita devoluciones por
+incompatibilidad). La app muestra por respuesta el inventario y su valor que la recomendación pone a la venta; el
+costo de operarlo frente a esa meta está en `cost/emerson_advisor_tco.xlsx`.
+
 ## Cómo funciona
 
 ```
@@ -49,17 +60,30 @@ make excel            # cost/emerson_advisor_tco.xlsx (TCO con supuestos editabl
 
 Reproducción completa local: `scripts/reproduce_from_scratch.sh --local-only`.
 
-### Todo en Databricks
+Los PDFs vienen versionados en `data/raw/`. Si los recibiste con la estructura del enunciado (`datos/pdfs/`),
+cópialos a `data/raw/` (lo que usa el job de Databricks) o, solo en local, `ADVISOR_PDF_DIR=datos/pdfs make app`.
+`make setup` también funciona desde un ZIP sin `.git` (omite los hooks).
+
+### Todo en Databricks (de cero a demo)
 
 ```bash
-databricks bundle deploy -t dev --profile lmrcolin
-databricks bundle run run_all -t dev --profile lmrcolin   # 00 → 07: bronze, silver, gold, grafo, matriz, AI Search
-make app-databricks PROFILE=lmrcolin    # datos en vivo de emerson_hw.gold.* (SQL warehouse) + AI Search + Llama
-make eval-databricks PROFILE=lmrcolin   # la misma evaluación, todo pasando por Databricks
+databricks auth login --host https://<tu-workspace>.cloud.databricks.com   # una vez (perfil por defecto)
+databricks bundle deploy -t dev
+databricks bundle run run_all -t dev   # 00 → 07: bronze, silver, gold, grafo, matriz, AI Search (~6 min; +~20 la 1.ª vez)
+make app-databricks                    # datos en vivo de emerson_hw.gold.* (SQL warehouse) + AI Search + Llama
+make eval-databricks                   # la misma evaluación, todo pasando por Databricks
 ```
 
-La barra lateral de la app muestra **Fuentes en uso** (comprobadas, no solo configuradas): origen de los datos,
-estado real de AI Search y cadena de LLM; cada respuesta indica qué motor aportó la evidencia y quién redactó.
+Con un perfil con nombre: `--profile <perfil>` en los comandos `databricks` y `PROFILE=<perfil>` en `make`.
+Si el workspace tiene más de un SQL warehouse: `ADVISOR_DATABRICKS_WAREHOUSE_ID=<id>`. Si ya existe otro endpoint
+de AI Search (Free Edition permite uno): `databricks bundle run run_all -t dev --params ai_search=false`; la app
+degrada a BM25 y lo indica.
+
+Cómo comprobar que se usa Databricks: menú **⋮ → Herramientas del agente** muestra el origen real de los datos
+(`Databricks en vivo: emerson_hw.gold.* vía SQL warehouse …`), el estado comprobado de AI Search y la cadena de LLM;
+cada respuesta indica qué motor aportó la evidencia (`bm25 N, ai_search N`) y quién redactó (`databricks` = Llama).
+En Databricks: Query History del warehouse, peticiones del serving endpoint de Llama, métricas del endpoint
+`emerson-vs` y `system.billing.usage`.
 
 Búsqueda híbrida con AI Search (requiere `databricks auth login`):
 `ADVISOR_RETRIEVAL_BACKEND=hybrid ADVISOR_DATABRICKS_PROFILE=<perfil> make app` · comparar motores:
@@ -68,10 +92,11 @@ Búsqueda híbrida con AI Search (requiere `databricks auth login`):
 ## Despliegue en Databricks
 
 Requisitos: Databricks CLI autenticada (`databricks auth login`), `uv` en el PATH (el deploy construye el wheel de
-`advisor`) y permiso `CREATE CATALOG` en el metastore (o un catálogo existente con `--var catalog=<catalogo>`).
+`advisor`) y permiso `CREATE CATALOG` en el metastore (en Free Edition, el dueño del workspace lo tiene). El
+catálogo es `emerson_hw` (los notebooks instalan el wheel desde `/Volumes/emerson_hw/bronze/libs`).
 
 ```bash
-databricks auth login --host https://<tu-workspace>.cloud.databricks.com --profile <perfil>
+databricks auth login --host https://<tu-workspace>.cloud.databricks.com
 databricks bundle validate
 databricks bundle deploy -t dev        # construye dist/*.whl con uv y sincroniza el repo
 databricks bundle run run_all -t dev   # ~5 min (+~20 min la primera vez que se provisiona AI Search)

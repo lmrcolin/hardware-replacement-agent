@@ -122,6 +122,8 @@ def _as_list(value: SpecValue) -> list[str]:
 
 
 INTERFACE_FAMILIES = ("PCIe", "USB")
+# A value that includes another one: a USB OTG port also works as device or host.
+ROLE_SUPERSETS: dict[str, frozenset[str]] = {"otg": frozenset({"device", "host"})}
 
 
 def _interface(required: str, candidate: str) -> tuple[RuleOutcome, str]:
@@ -200,7 +202,8 @@ def _compare(
         required = float(req.value)
         ok = cand_v >= required if req.operator is Operator.GTE else cand_v <= required
         symbol = "≥" if req.operator is Operator.GTE else "≤"
-        shown = f"{value} {unit}".strip(), f"{req.value} {unit}".strip()
+        cand_unit = "" if cand.unit == "count" else (cand.unit or unit)
+        shown = f"{value} {cand_unit}".strip(), f"{req.value:g} {unit}".strip()
         if not ok:
             return RuleOutcome.FAIL, f"{key}: {shown[0]} no cumple {symbol} {shown[1]}", None
         if (
@@ -232,6 +235,8 @@ def _compare(
         return outcome, f"{key}: {text}", None
     if _norm(value) == _norm(req.value):
         return RuleOutcome.PASS, f"{key}: {value} = {req.value}", None
+    if _norm(req.value) in ROLE_SUPERSETS.get(_norm(value).lstrip("0123456789x"), ()):
+        return RuleOutcome.PASS, f"{key}: {value} incluye el modo {req.value}", None
     return RuleOutcome.FAIL, f"{key}: {value} ≠ {req.value}", None
 
 

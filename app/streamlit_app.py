@@ -3,7 +3,9 @@
 Widget pattern: header with avatar, name, online status and settings menu; bot and customer
 bubbles; quick-reply buttons; "was this helpful?" rating; input at the bottom; minimize button.
 Each answer shows what the agent did (its trace, explained) and the structured result behind it.
-The sidebar keeps the search history and the most searched topics (components/history.py).
+The sidebar keeps the search history (components/history.py): the most searched parts with their
+catalog description and status, the latest questions with when and what the agent answered, and
+how many answers were rated useful.
 When the agent asks for clarification, the customer's reply is combined with the previous
 question before it is sent, because the agent itself is stateless per query.
 """
@@ -24,13 +26,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from components.history import (
     OUTCOME_LABEL,
     SearchLog,
+    Trend,
     recent,
+    relative_time,
     satisfaction,
     search_record,
     trending,
+    unidentified,
 )
 from components.images import image_html
 from components.render import (
+    CATEGORY_LABEL,
     clarification_options,
     parts_to_replace,
     reasoning,
@@ -46,7 +52,13 @@ from mock_agent import MockAdvisorAgent
 
 from advisor.agent import Advisor, AdvisorAgent
 from advisor.config import LLMChoice
-from advisor.models import CommercialStatus, CustomerQuery, RecommendationResponse
+from advisor.models import (
+    Category,
+    CommercialStatus,
+    CustomerQuery,
+    Product,
+    RecommendationResponse,
+)
 from advisor.pipeline import (
     BuiltArtifacts,
     build_agent,
@@ -69,7 +81,7 @@ EXAMPLES = {
     "Part number con errata": "Reemplazo para la E81O-CQDA2",
     "Consulta vaga": "Busco un microcontrolador barato",
 }
-ARROW = {"up": "↑", "down": "↓", "flat": "→"}
+STATUS_TONE = {"DISCONTINUED": "bad", "EOL": "bad", "NRND": "warn", "ACTIVE": "ok"}
 
 
 @dataclass
@@ -186,6 +198,50 @@ def rate(turn_id: str) -> None:
         search_log.rate(turn_id, useful=value == 1)
 
 
+def clear_history() -> None:
+    search_log.clear()
+
+
+def _category_label(value: str | None) -> str | None:
+    try:
+        return CATEGORY_LABEL[Category(value)] if value else None
+    except ValueError:
+        return value
+
+
+def _section(title: str, note: str) -> None:
+    st.markdown(
+        f'<div class="hist-head"><b>{escape(title)}</b><span>{escape(note)}</span></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _trend_label(trend: Trend) -> str:
+    return trend.topic if trend.is_part else _category_label(trend.topic) or trend.topic
+
+
+def _trend_html(trend: Trend, top: int, catalog: dict[str, Product]) -> str:
+    """What the topic is (catalog description and status), its share and the weekly change."""
+    product = catalog.get(trend.topic) if trend.is_part else None
+    if product is not None:
+        status = product.commercial.status.value if product.commercial else None
+        what = escape(product.description or _category_label(product.category) or "")
+        if status:
+            what += f' <span class="chip {STATUS_TONE.get(status, "ok")}">{status}</span>'
+    elif trend.is_part:
+        what = escape(_category_label(trend.category) or "Pieza del catálogo")
+    else:
+        what = "Categoría · búsqueda por requisitos"
+    count = f"{trend.total} {'búsqueda' if trend.total == 1 else 'búsquedas'}"
+    detail = f"{trend.total} en los últimos 7 días · {trend.previous} en los 7 días anteriores"
+    return (
+        f'<div class="trend"><div class="trend-what">{what}</div>'
+        f'<div class="trend-bar"><div style="width:{trend.total / top:.0%}"></div></div>'
+        f'<div class="trend-count"><span>{count}</span>'
+        f'<b class="{trend.direction}" title="{detail}">{trend.change}</b></div></div>'
+    )
+
+
 # Only on a fresh session: later reruns keep ?k= in the URL and must not re-send it.
 if "k" in st.query_params and not state.get("url_used") and not turns:
     ask(st.query_params["k"], follow_up=False)
@@ -193,51 +249,83 @@ state["url_used"] = True
 
 # ---------------------------------------------------------------- sidebar: history and trends
 history_rows = search_log.read()
+# Descriptions and statuses come from the catalog (source of truth); none in simulated mode.
+catalog = (
+    {p.part_number: p for p in get_artifacts().products} if state.get("agent", REAL) == REAL else {}
+)
 with st.sidebar:
     st.markdown("### Historial de búsqueda")
+    st.caption("Consultas hechas al agente en este equipo. Pulsa una para repetirla.")
+
     trends = trending(history_rows)
-    st.markdown("**Más buscadas · últimos 7 días**")
+    _section("Más buscadas", "Piezas y categorías más consultadas en los últimos 7 días.")
     if trends:
-        top = trends[0].total
         for i, trend in enumerate(trends):
-            with st.container(key=f"trend-{i}"):
+            with st.container(key=f"hist-trend-{i}"):
                 st.button(
-                    f"{trend.topic}",
+                    _trend_label(trend),
                     key=f"trend-ask-{i}",
                     on_click=ask,
                     args=(trend.example,),
                     kwargs={"follow_up": False},
                     type="tertiary",
+                    help=f"Repetir: {trend.example}",
+                )
+                st.markdown(_trend_html(trend, trends[0].total, catalog), unsafe_allow_html=True)
+    else:
+        st.caption("Aún no hay búsquedas esta semana. Aquí verás las piezas que más se consultan.")
+    skipped = unidentified(history_rows)
+    if skipped:
+        st.caption(
+            f"{skipped} {'consulta' if skipped == 1 else 'consultas'} sin pieza ni categoría "
+            "reconocida (saludos, pruebas, erratas) no se cuentan; aparecen en Recientes."
+        )
+
+    latest = recent(history_rows)
+    _section("Recientes", "Últimas consultas distintas y qué respondió el agente.")
+    if latest:
+        for i, record in enumerate(latest):
+            text = record["text"]
+            result = record.get("outcome", "")
+            with st.container(key=f"hist-recent-{i}"):
+                st.button(
+                    text if len(text) <= 80 else text[:79] + "…",
+                    key=f"recent-{i}",
+                    on_click=ask,
+                    args=(record.get("sent") or text,),
+                    kwargs={"follow_up": False},
+                    type="tertiary",
+                    help=f"Repetir esta consulta · {record['ts'][:16].replace('T', ' ')} UTC",
                 )
                 st.markdown(
-                    f'<div class="trend"><div class="bar" style="width:{trend.total / top:.0%}">'
-                    f"</div><span>{trend.total} {'búsqueda' if trend.total == 1 else 'búsquedas'} "
-                    f'<b class="{trend.direction}">{ARROW[trend.direction]}</b> '
-                    f"vs. 7 días previos ({trend.previous})</span></div>",
+                    f'<div class="recent-meta"><span>{relative_time(record["ts"])}</span>'
+                    f'<span class="outcome {escape(result)}">'
+                    f"{OUTCOME_LABEL.get(result, 'sin resultado registrado')}</span></div>",
                     unsafe_allow_html=True,
                 )
     else:
-        st.caption("Aún no hay búsquedas registradas.")
-    st.markdown("**Búsquedas recientes**")
-    latest = recent(history_rows)
-    if latest:
-        for i, record in enumerate(latest):
-            label = record["text"] if len(record["text"]) <= 46 else record["text"][:45] + "…"
-            st.button(
-                label,
-                key=f"recent-{i}",
-                on_click=ask,
-                args=(record["sent"] or record["text"],),
-                kwargs={"follow_up": False},
-                type="tertiary",
-                help=f"{record['ts'][:16].replace('T', ' ')} UTC · "
-                f"{OUTCOME_LABEL.get(record.get('outcome', ''), '')}",
-            )
-    else:
-        st.caption("Tus búsquedas aparecerán aquí.")
+        st.caption(
+            "Tus consultas aparecerán aquí. Prueba un ejemplo del chat o escribe un part number."
+        )
+
     useful, rated = satisfaction(history_rows)
-    if rated:
-        st.caption(f"Respuestas valoradas como útiles: {useful} de {rated}")
+    _section(
+        "Utilidad de las respuestas",
+        f"{useful} de {rated} respuestas valoradas fueron útiles (botones «¿Te fue útil?»)."
+        if rated
+        else "Aún no hay valoraciones. Usa «¿Te fue útil?» bajo cada respuesta.",
+    )
+    if history_rows:
+        with st.popover(
+            "Borrar historial", icon=":material/delete:", type="tertiary", key="history-menu"
+        ):
+            st.caption(
+                "Se borran las búsquedas y valoraciones guardadas en este equipo; la conversación "
+                "actual no cambia. El registro anterior se conserva como copia de respaldo (.bak)."
+            )
+            st.button(
+                "Sí, borrar historial", key="history-clear", on_click=clear_history, type="primary"
+            )
 
 # ---------------------------------------------------------------- widget header
 minimized = state.get("minimized", False)
@@ -424,9 +512,9 @@ with st.container(key="llm-choice", horizontal=True, vertical_alignment="center"
         "stock los deciden siempre las herramientas deterministas y el catálogo.",
         width=320,
     )
-    status = llm_status(chosen_llm())
-    if status != "ready":
-        st.caption(f"Claude no está listo ({status}): se responde con plantillas.")
+    llm_state = llm_status(chosen_llm())
+    if llm_state != "ready":
+        st.caption(f"Claude no está listo ({llm_state}): se responde con plantillas.")
 if voice_installed() and not state.get("voice_shown"):
     _wait_for_voice()
 st.chat_input(placeholder, key="chat", on_submit=ask, accept_audio=voice_available())

@@ -61,7 +61,7 @@ header[data-testid="stHeader"] button, header[data-testid="stHeader"] a {{ point
   display: flex; align-items: center; justify-content: center; font-weight: 800;
   box-shadow: 0 0 0 3px rgba(255,255,255,.35);
 }}
-.head-status {{ font-size: 13px; opacity: .92; margin: 10px 0 4px 2px; }}
+.head-status {{ font-size: 13px; opacity: .92; margin: 10px 0 4px 14px; }}  /* clear of the curve */
 .head-status .dot {{
   display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #5EEAD4;
   margin-right: 6px; box-shadow: 0 0 0 3px rgba(94,234,212,.25);
@@ -150,8 +150,13 @@ ol.steps li::before {{
 [class*="st-key-rating-"] {{ border-top: 1px solid {LINE}; padding-top: 6px; margin-top: 4px; }}
 
 /* ---- input: rounded pill with teal send button ---- */
-[data-testid="stChatInput"] {{ border-radius: 999px; border: 1.5px solid {LINE}; }}
-[data-testid="stChatInput"]:focus-within {{ border-color: {ACCENT}; }}
+/* Streamlit paints its own border (radius 8px) on the inner wrapper and turns it teal on
+   focus; its corners poked out of our pill. Only the inner wrapper draws the border now. */
+[data-testid="stChatInput"] {{ border: none; border-radius: 999px; }}
+[data-testid="stChatInput"] > div {{
+  border-radius: 999px; border: 1.5px solid {LINE}; outline: none; box-shadow: none;
+}}
+[data-testid="stChatInput"]:focus-within > div {{ border-color: {ACCENT}; }}
 [data-testid="stChatInputSubmitButton"] {{
   background: {ACCENT}; color: #fff; border-radius: 50%;
 }}
@@ -182,19 +187,66 @@ ol.steps li::before {{
 
 /* ---- sidebar: history and trends ---- */
 [data-testid="stSidebar"] {{ background: {CARD}; }}
-[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{ gap: .45rem; }}
-[data-testid="stSidebar"] button[kind="tertiary"] {{
-  color: {INK}; text-align: left; justify-content: flex-start; padding: 2px 0;
-}}
-[data-testid="stSidebar"] button[kind="tertiary"]:hover {{ color: {ACCENT}; }}
-.trend {{ margin: 0 0 10px 0; font-size: 12px; color: {MUTED}; line-height: 1.3; }}
-[data-testid="stSidebar"] h3 {{ padding: 0 0 .25rem 0; line-height: 1.3; }}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{ gap: .55rem; }}
+[data-testid="stSidebar"] h3 {{ padding: 0; line-height: 1.3; }}
 [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {{ margin: 0; line-height: 1.35; }}
 [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {{ margin-bottom: 0 !important; }}
-.trend .bar {{ height: 6px; border-radius: 3px; background: {ACCENT}; opacity: .8; margin: 2px 0; }}
-.trend .up {{ color: {ACCENT}; }}
-.trend .down {{ color: #B42318; }}
-.trend .flat {{ color: {MUTED}; }}
+[data-testid="stSidebar"] button[kind="tertiary"] {{
+  color: {INK}; text-align: left; justify-content: flex-start; padding: 0; min-height: 0;
+}}
+[data-testid="stSidebar"] button[kind="tertiary"]:hover {{ color: {ACCENT}; }}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {{
+  font-size: 12px; line-height: 1.4;
+}}
+/* section title: name plus a one-line explanation, separated by a rule */
+.hist-head {{ border-top: 1px solid {LINE}; padding-top: 12px; margin-top: 4px; }}
+.hist-head b {{ display: block; font-size: 14px; color: {INK}; }}
+.hist-head span {{ display: block; font-size: 12px; color: {MUTED}; line-height: 1.35; }}
+/* one entry = a compact stack (button + details); entries are separated by the block gap */
+[data-testid="stSidebar"] [class*="st-key-hist-"] {{ gap: 3px; padding-bottom: 4px; }}
+[class*="st-key-hist-trend-"] button p {{ font-weight: 600; letter-spacing: .01em; }}
+[class*="st-key-hist-recent-"] button p {{
+  font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; text-overflow: ellipsis;
+}}
+.chip {{
+  display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: .02em;
+  padding: 0 6px; border-radius: 999px; line-height: 16px; white-space: nowrap;
+}}
+.chip.bad {{ background: #FEE4E2; color: #B42318; }}
+.chip.warn {{ background: #FEF0C7; color: #B54708; }}
+.chip.ok {{ background: {ACCENT_SOFT}; color: {ACCENT}; }}
+.trend {{ font-size: 12px; color: {MUTED}; line-height: 1.4; }}
+.trend-bar {{
+  height: 6px; border-radius: 3px; background: {LINE}; margin: 4px 0; overflow: hidden;
+}}
+.trend-bar div {{ height: 100%; border-radius: 3px; background: {ACCENT}; }}
+.trend-count {{
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 2px 8px;
+}}
+.trend-count b {{
+  font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 999px; line-height: 17px;
+  cursor: help; white-space: nowrap;
+}}
+.trend-count b.new, .trend-count b.up {{ background: {ACCENT_SOFT}; color: {ACCENT}; }}
+.trend-count b.down, .trend-count b.flat {{ background: {PAGE}; color: {MUTED}; }}
+.recent-meta {{
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; font-size: 12px;
+  color: {MUTED}; line-height: 1.4;
+}}
+.outcome {{ white-space: nowrap; }}
+.outcome::before {{
+  content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  margin-right: 5px; background: {MUTED}; vertical-align: 1px;
+}}
+.outcome.recommended {{ color: {ACCENT}; }}
+.outcome.recommended::before {{ background: {ACCENT}; }}
+.outcome.risky {{ color: #B54708; }}
+.outcome.risky::before {{ background: #B54708; }}
+.outcome.none {{ color: #B42318; }}
+.outcome.none::before {{ background: #B42318; }}
+.outcome.clarify::before {{ background: transparent; box-shadow: inset 0 0 0 1.5px {MUTED}; }}
+[data-testid="stSidebar"] .st-key-history-menu button {{ color: {MUTED}; padding: 2px 6px 2px 0; }}
 
 @media (max-width: 640px) {{
   .pimg img {{ max-height: 110px; }}

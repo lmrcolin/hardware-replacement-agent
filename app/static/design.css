@@ -54,9 +54,11 @@
 .stApp [data-testid="stMarkdownContainer"] p { line-height: 1.47; }
 .stApp :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-control); }
 [data-testid="stDecoration"] { display: none; }
-/* La barra propia de Streamlit queda invisible y no bloquea clics (solo su botón de barra lateral). */
+/* La barra propia de Streamlit queda invisible y no bloquea clics (solo su botón de barra lateral).
+   Su stToolbar (56 px, z-index 999990) trae pointer-events: auto y tapaba los botones de .st-key-topbar. */
 header[data-testid="stHeader"] { background: transparent; pointer-events: none; height: 0; }
-header[data-testid="stHeader"] button, header[data-testid="stHeader"] a { pointer-events: auto; }
+header[data-testid="stHeader"] * { pointer-events: none !important; }
+header[data-testid="stHeader"] button, header[data-testid="stHeader"] a { pointer-events: auto !important; }
 [data-testid="stMainBlockContainer"], [data-testid="stBottomBlockContainer"] {
   max-width: var(--page); padding-left: var(--s6); padding-right: var(--s6);
 }

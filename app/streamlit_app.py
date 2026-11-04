@@ -102,10 +102,9 @@ def ask(text: str | None = None, *, follow_up: bool = True) -> None:
     text = (text if text is not None else state.get("chat") or "").strip()
     if not text:
         return
-    sent = text
-    if follow_up and turns and turns[-1].response.clarification_question:
-        sent = f"{turns[-1].sent} {text}"
-    state["pending"] = (text, sent)
+    # The agent remembers the conversation through response.context (contract 1.2.0).
+    state["pending"] = (text, text)
+    state["fresh"] = not follow_up
     state["minimized"] = False
 
 
@@ -237,8 +236,9 @@ known_parts = [p.part_number for p in get_artifacts().products] if kind == REAL 
 pending = state.pop("pending", None)
 if pending:
     shown, sent = pending
-    with st.spinner("El agente está analizando: interpreta, consulta catálogo y grafo, valida…"):
-        response = agent.answer(CustomerQuery(text=sent))
+    memory = turns[-1].response.context if turns and not state.pop("fresh", False) else None
+    with st.spinner("El agente está planeando y usando sus herramientas…"):
+        response = agent.answer(CustomerQuery(text=sent, context=memory))
     trace = [str(step) for step in getattr(agent, "last_trace", [])]
     found_by = evidence_sources(agent.retriever) if isinstance(agent, AdvisorAgent) else None
     turn = Turn(shown, sent, response, trace, found_by)
@@ -296,7 +296,9 @@ for i, turn in enumerate(turns):
         if steps:
             reasoning_view(steps, turn.response)
         response_view(turn.response, names, turn=i)
-        options = clarification_options(turn.response.clarification_question, known_parts)
+        options = turn.response.clarification_options or clarification_options(
+            turn.response.clarification_question, known_parts
+        )
         if options and i == len(turns) - 1:
             with st.container(key=f"quick-options-{i}"):
                 for pn in options:

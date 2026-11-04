@@ -13,6 +13,7 @@ from advisor.models import ParsedQuery
 
 QUERY_OPEN, QUERY_CLOSE = "<<<CONSULTA", "CONSULTA>>>"
 DRAFT_OPEN, DRAFT_CLOSE = "<<<BORRADOR", "BORRADOR>>>"
+PLAN_OPEN, PLAN_CLOSE = "<<<SITUACION", "SITUACION>>>"
 
 
 def _between(text: str, start: str, end: str) -> str:
@@ -64,3 +65,21 @@ def build_nlg_prompt(draft: str) -> str:
 
 def extract_draft(prompt: str) -> str:
     return _between(prompt, DRAFT_OPEN, DRAFT_CLOSE)
+
+
+def build_planner_prompt(situation: str, tools: dict[str, str], schema: dict[str, object]) -> str:
+    """Ask for the ordered tool calls that answer the customer (ReAct-style plan, ADR-014)."""
+    catalog = "\n".join(f"- {name}: {doc}" for name, doc in tools.items())
+    return (
+        "Eres el planificador de un agente de reemplazo de hardware. Decide qué herramientas "
+        "ejecutar y en qué orden para atender al cliente. Las herramientas son deterministas: "
+        "tú no decides compatibilidad, precios ni stock, solo el plan.\n"
+        f"Herramientas:\n{catalog}\n"
+        "Reglas: usa solo part numbers que aparezcan en la situación; termina con finish; "
+        "máximo 6 pasos; si el cliente busca sustituto, identifica la pieza y busca sustitutos; "
+        "si no hay resultados, intenta relax_requirements; si pregunta algo técnico usa "
+        "ask_datasheets; si pide comparar usa compare; si falta información usa ask_customer.\n"
+        "Devuelve SOLO un JSON con este esquema: "
+        f"{json.dumps(schema, ensure_ascii=False)}\n"
+        f"{PLAN_OPEN}\n{situation}\n{PLAN_CLOSE}"
+    )

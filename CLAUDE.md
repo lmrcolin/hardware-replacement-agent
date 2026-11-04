@@ -13,7 +13,8 @@ de 24 h. Responde siempre en español salvo que se pida otro idioma.
 ## 10 reglas duras
 
 1. **El catálogo es la verdad** para estado, precio y stock. Los datasheets nunca lo sobrescriben.
-2. **El LLM no decide ni inventa.** Solo NLU (JSON validado por Pydantic) y NLG con cifras ya presentes en la respuesta estructurada.
+2. **El LLM no decide ni inventa.** Interpreta (NLU, JSON validado por Pydantic), planifica qué herramientas deterministas usar
+   (plan validado por un guardián, ADR-014) y redacta (NLG) con cifras ya presentes en la respuesta estructurada.
 3. **Regla crítica fallida ⇒ INCOMPATIBLE.** Dato faltante ⇒ UNKNOWN, nunca COMPATIBLE. Similitud semántica nunca concede compatibilidad.
 4. **Solo ACTIVE se recomienda.** NRND va a `risky_options` con advertencia; DISCONTINUED/EOL nunca son sustitutos.
 5. **0 USD en APIs.** Llama vía Databricks FMAPI, Ollama local o plantillas. Sin claves de pago.

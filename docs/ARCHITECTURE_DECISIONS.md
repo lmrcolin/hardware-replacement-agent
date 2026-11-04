@@ -64,3 +64,17 @@ COMPATIBLE_WITH_CONDITIONS), `recommendation/ranking.py` (`RankedOutput` con ter
 **Estado:** implementado en la rama `contract/unverified-options` (cambio de contrato). `recommendations` solo admite
 COMPATIBLE / COMPATIBLE_WITH_CONDITIONS; `unverified_options` solo ACTIVE + UNKNOWN; `RankedOutput` tiene tercera lista;
 el borrador y la UI los muestran como "Posibles, sin datos suficientes". Caso real: Cortex-A78 → w9-3595X.
+
+## ADR-014 Agente con herramientas: el LLM planifica, las herramientas deciden (Aceptado — `CONTRACT_VERSION` 1.2.0)
+**Contexto:** el agente era una máquina de estados fija; el LLM solo hacía NLU y NLG. No recordaba la conversación,
+no negociaba requisitos cuando no había sustituto, no respondía preguntas técnicas ni comparaba productos, y sus
+aclaraciones eran genéricas. El reto pide un sistema *agéntico* que oriente al cliente.
+**Decisión:** el LLM (Llama 3.3 vía FMAPI) propone un plan de herramientas deterministas (`AgentPlan` JSON
+validado); un guardián lo valida paso a paso contra una política de reglas, que también decide sola sin LLM. Se
+agregan memoria (`ConversationContext`), negociación (`relaxations`), respuestas técnicas con `citations`,
+aclaraciones con `clarification_options` y la traza `tool_calls`. La regla dura 2 pasa a: "el LLM interpreta,
+planifica y redacta; nunca decide compatibilidad ni inventa cifras".
+**Consecuencias:** campos nuevos opcionales en `CustomerQuery` y `RecommendationResponse` (compatibles hacia atrás);
+`relaxations` nunca son recomendaciones (validador: ACTIVE y nivel confirmado *sin* el requisito quitado);
+`negotiable: false` en el registro para specs que definen el producto. Con Llama cada turno hace ~3 llamadas
+(NLU, plan, NLG). Detalle: `docs/AGENT_DESIGN.md`.

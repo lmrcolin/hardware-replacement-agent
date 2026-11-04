@@ -76,20 +76,24 @@ def test_clarification_offers_options_and_keeps_context() -> None:
     option = "E810-CQDA2"
     at.button(key=f"opt-0-{option}").click().run()
     assert not at.exception
-    assert any("contexto anterior" in c.value for c in at.caption)
     assert next(s.value for s in at.subheader) == "1. MCX75310AAS-NEAT"
 
 
-def test_free_text_answer_to_a_clarification_is_sent_with_the_question() -> None:
-    at = ask("Reemplazo para la E81O-CQDA2")
-    chat(at, "E810-CQDA2")
-    sent = [c.value for c in at.caption if "contexto anterior" in c.value]
-    assert sent and "Reemplazo para la E81O-CQDA2 E810-CQDA2" in sent[0]
+def test_free_text_follow_up_uses_the_conversation_memory() -> None:
+    at = ask("Necesito reemplazar la E810-CQDA2")
+    chat(at, "¿y la más barata?")  # no part number: the agent remembers it (contract 1.2.0)
+    turns = at.session_state["turns"]
+    assert turns[-1].response.original.part_number == "E810-CQDA2"
+    assert turns[-1].response.recommendations[0].product.part_number == "BCM57508"
 
 
 def test_a100_explains_blocked_successor() -> None:
     at = ask("Necesito reemplazar la A100")
-    assert "H100-SXM5 como sucesor" in markdown(at) and not at.subheader
+    assert "H100-SXM5 como sucesor" in markdown(at)
+    assert "Sustitutos recomendados" not in markdown(at)
+    # Not a recommendation: offered only "if you can do without" the SXM4 form factor.
+    assert any(e.label.startswith("Si puedes prescindir de un requisito") for e in at.expander)
+    assert [s.value for s in at.subheader] == ["1. H100-SXM5"]
 
 
 def test_example_and_part_shortcuts_start_new_questions() -> None:

@@ -8,7 +8,7 @@ import pytest
 
 from advisor.commercial import CommercialEngine
 from advisor.compatibility import derive_requirements, evaluate
-from advisor.compatibility.engine import _interface
+from advisor.compatibility.engine import _compare, _interface
 from advisor.models import (
     Category,
     CommercialInformation,
@@ -250,3 +250,12 @@ def test_family_only_interface_requirement(
     required: str, candidate: str, outcome: RuleOutcome
 ) -> None:
     assert _interface(required, candidate)[0] is outcome
+
+
+def test_usb_otg_port_satisfies_a_device_requirement() -> None:
+    req = TechnicalRequirement(
+        key="usb", operator=Operator.EQ, value="device", priority=Priority.SHOULD,
+        origin=RequirementOrigin.ORIGINAL_SPEC,
+    )  # fmt: skip
+    cand = ProductSpecification(key="usb", value="otg")
+    assert _compare(req, cand, None)[0] is RuleOutcome.PASS

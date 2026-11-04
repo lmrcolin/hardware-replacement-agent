@@ -69,6 +69,7 @@ _ENV_OVERRIDES: dict[str, tuple[str, ...]] = {
     "ADVISOR_REPOSITORY_BACKEND": ("repository_backend",),
     "ADVISOR_RETRIEVAL_BACKEND": ("retrieval", "backend"),
     "ADVISOR_OLLAMA_HOST": ("llm", "ollama_host"),
+    "ADVISOR_PDF_DIR": ("paths", "pdf_dir"),  # p. ej. datos/pdfs (estructura del enunciado)
 }
 
 

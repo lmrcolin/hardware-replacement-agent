@@ -6,16 +6,18 @@ import logging
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from decimal import Decimal
 from enum import StrEnum
 from typing import Protocol
 
 import networkx as nx
 
-from advisor.agent.compose import draft_message, unverified_tokens
+from advisor.agent.compose import draft_message, fail_reasons, money, unverified_tokens
 from advisor.commercial import CommercialEngine
 from advisor.compatibility import derive_requirements, evaluate
 from advisor.compatibility.engine import ANY, base_key, default_registry
 from advisor.extraction import SpecDefinition, SpecRegistry
+from advisor.extraction.registry import fold
 from advisor.kg import candidate_neighbors, resolve_part
 from advisor.llm import (
     LLMClient,
@@ -28,6 +30,7 @@ from advisor.llm import (
 )
 from advisor.models import (
     Category,
+    CommercialStatus,
     CompatibilityLevel,
     CompatibilityResult,
     CustomerQuery,
@@ -35,9 +38,12 @@ from advisor.models import (
     Operator,
     ParsedQuery,
     PartMatch,
+    Priority,
     Product,
     Recommendation,
     RecommendationResponse,
+    RequirementOrigin,
+    RuleOutcome,
     TechnicalRequirement,
 )
 from advisor.recommendation import rank
@@ -48,6 +54,20 @@ log = logging.getLogger(__name__)
 CONFIDENT = 0.85  # minimum PartMatch score to act without asking
 SUGGEST = 0.6  # fuzzy matches above this are offered back, never assumed
 AMBIGUITY_GAP = 0.05  # two matches closer than this → ask which one
+MAX_REJECTED = 3  # discarded candidates explained when nothing is recommended
+
+# Explicit customer constraints, read deterministically from the query (never by the LLM).
+CHEAP = re.compile(r"barat|econ[oó]mic|cheap|low[- ]cost|menor precio|bajo costo|presupuesto", re.I)
+SAME_FOOTPRINT = re.compile(
+    r"pin[- ]?(?:to[- ]?pin[- ]?)?compatible|drop[- ]?in|mismo encapsulado|same package|footprint",
+    re.I,
+)
+MAKER_CONSTRAINT = re.compile(
+    r"(?:debe ser|tiene que ser|que sea|s[oó]lo|[uú]nicamente|marca|fabricante|must be|only)"
+    r"\s+(?:de\s+|del\s+|from\s+)?(.{1,60})",
+    re.I,
+)
+LEVEL_ORDER = list(CompatibilityLevel)
 
 
 class AgentStep(StrEnum):
@@ -190,17 +210,43 @@ class AdvisorAgent:
                     matches[m.part_number] = m
         return sorted(matches.values(), key=lambda m: (-m.score, m.part_number))
 
-    def _clarify(self, run: _Run, parsed: ParsedQuery, question: str) -> RecommendationResponse:
+    def _clarify(
+        self, run: _Run, parsed: ParsedQuery, question: str, *, options: str = ""
+    ) -> RecommendationResponse:
         run.trace.append(AgentStep.CLARIFY)
-        return self._response(
-            run,
-            parsed,
-            None,
-            [],
-            [],
-            question,
-            message="Necesito un dato más para buscar un sustituto.",
-        )
+        message = "Necesito un dato más para buscar un sustituto."
+        if options:
+            message = f"{options}\n{message}"
+        return self._response(run, parsed, None, [], [], question, message=message)
+
+    def _catalog_options(self, parsed: ParsedQuery, run: _Run) -> str:
+        """Vague query with a known category: show what is for sale while asking for the need."""
+        if parsed.category is None:
+            return ""
+        active = [
+            (p.part_number, p.commercial)
+            for p in self.products.values()
+            if p.category is parsed.category
+            and p.commercial is not None
+            and p.commercial.status is CommercialStatus.ACTIVE
+        ]
+        if not active:
+            return ""
+        cheap = CHEAP.search(run.query.text) is not None
+        if cheap:
+            active.sort(key=lambda pc: (pc[1].price_usd or Decimal("Infinity"), pc[0]))
+        else:
+            active.sort(key=lambda pc: (-(pc[1].stock_units or 0), pc[0]))
+        order = "de menor a mayor precio" if cheap else "por inventario"
+        lines = [
+            f"Opciones ACTIVE de {parsed.category.value} en el catálogo ({order}; "
+            "compatibilidad aún sin validar):"
+        ]
+        lines += [
+            f"- {pn} — {c.description}: {money(c.price_usd)}; {c.stock_units} unidades."
+            for pn, c in active
+        ]
+        return "\n".join(lines)
 
     def _discover(self, original: Product, run: _Run) -> list[Product]:
         run.trace.append(AgentStep.DISCOVER)
@@ -258,7 +304,9 @@ class AdvisorAgent:
                     "¿Qué part number quieres reemplazar o qué requisitos técnicos debe cumplir "
                     f"el componente{' de ' + parsed.category.value if parsed.category else ''}?"
                 )
-                return self._clarify(run, parsed, question)
+                return self._clarify(
+                    run, parsed, question, options=self._catalog_options(parsed, run)
+                )
             return self._find_by_requirements(run, parsed)
 
         original = self.products[confident[0].part_number]
@@ -273,7 +321,10 @@ class AdvisorAgent:
                 "catálogo."
             )
         parsed = parsed.model_copy(update={"category": original.category})
-        candidates = self._discover(original, run)
+        parsed = self._footprint_requirement(parsed, original, run)
+        candidates, rejected = self._maker_filter(
+            self._discover(original, run), original.category, run
+        )
 
         run.trace.append(AgentStep.VALIDATE)
         requirements = derive_requirements(original, parsed, registry=self.registry)
@@ -287,9 +338,11 @@ class AdvisorAgent:
             for s in self._successors(original.part_number)
             if s in by_candidate and by_candidate[s].level is CompatibilityLevel.INCOMPATIBLE
         }
+        rejected += self._rejected(results, exclude=set(blocked))
         return self._response(
-            run, parsed, original, ranked.recommendations, ranked.risky_options, None,
-            blocked=blocked, unverified=ranked.unverified_options,
+            run, parsed, original, self._by_price(ranked.recommendations, run),
+            ranked.risky_options, None, blocked=blocked, unverified=ranked.unverified_options,
+            rejected=rejected,
         )  # fmt: skip
 
     def _find_by_requirements(self, run: _Run, parsed: ParsedQuery) -> RecommendationResponse:
@@ -297,16 +350,115 @@ class AdvisorAgent:
         assert parsed.category is not None
         reference = Product(part_number="CONSULTA", manufacturer="", category=parsed.category)
         run.trace.extend([AgentStep.DISCOVER, AgentStep.VALIDATE])
-        candidates = [p for p in self.products.values() if p.category is parsed.category]
+        candidates, rejected = self._maker_filter(
+            [p for p in self.products.values() if p.category is parsed.category],
+            parsed.category,
+            run,
+        )
         results = [
             evaluate(reference, c, parsed.requirements, registry=self.registry) for c in candidates
         ]
         run.trace.append(AgentStep.RANK)
         ranked = rank(results, self.products)
+        rejected += self._rejected(results, exclude=set())
         return self._response(
-            run, parsed, None, ranked.recommendations, ranked.risky_options, None,
-            unverified=ranked.unverified_options,
+            run, parsed, None, self._by_price(ranked.recommendations, run),
+            ranked.risky_options, None, unverified=ranked.unverified_options, rejected=rejected,
         )  # fmt: skip
+
+    # ------------------------------------------------------------ constraints
+
+    def _footprint_requirement(
+        self, parsed: ParsedQuery, original: Product, run: _Run
+    ) -> ParsedQuery:
+        """ "Pin compatible" / "drop-in" makes the original's package a MUST requirement."""
+        if not SAME_FOOTPRINT.search(run.query.text):
+            return parsed
+        package = next((s for s in original.specifications if s.key == "package"), None)
+        if package is None or package.value is None:
+            run.warnings.append(
+                f"Se pidió compatibilidad pin a pin, pero el datasheet de {original.part_number} "
+                "no declara el encapsulado: no se puede verificar."
+            )
+            return parsed
+        requirement = TechnicalRequirement(
+            key="package", operator=Operator.EQ, value=package.value,
+            priority=Priority.MUST, origin=RequirementOrigin.QUERY,
+        )  # fmt: skip
+        return parsed.model_copy(update={"requirements": [*parsed.requirements, requirement]})
+
+    def _maker_filter(
+        self, candidates: Sequence[Product], category: Category, run: _Run
+    ) -> tuple[list[Product], list[tuple[str, str, list[str]]]]:
+        """Honor "debe ser de <fabricante>": other makers are discarded with the reason."""
+        match = MAKER_CONSTRAINT.search(run.query.text)
+        if match is None:
+            return list(candidates), []
+        wanted_text = fold(match.group(1))
+        makers = {
+            word
+            for p in self.products.values()
+            if p.commercial is not None
+            for word in re.findall(r"[a-z0-9]{3,}", fold(p.commercial.manufacturer))
+            if re.search(rf"(?<![a-z0-9]){word}(?![a-z0-9])", wanted_text)
+        }
+        if not makers:
+            return list(candidates), []
+        kept, rejected = [], []
+        asked = re.split(r"\s+(?:y|e|and|con|with)\s+|[,.;]", match.group(1).strip())[0]
+        for c in candidates:
+            maker = c.commercial.manufacturer if c.commercial else c.manufacturer
+            if set(re.findall(r"[a-z0-9]{3,}", fold(maker))) & makers:
+                kept.append(c)
+            elif c.category is category:
+                description = c.commercial.description if c.commercial else c.part_number
+                rejected.append(
+                    (c.part_number, description, [f"fabricante {maker}; se pidió {asked}"])
+                )
+        run.warnings.append(f"Solo se consideran fabricantes que coinciden con: {asked}.")
+        return kept, rejected
+
+    def _rejected(
+        self, results: Sequence[CompatibilityResult], *, exclude: set[str]
+    ) -> list[tuple[str, str, list[str]]]:
+        """Best same-category candidates that failed a critical rule, with the reason."""
+        failed = [
+            r
+            for r in results
+            if r.level is CompatibilityLevel.INCOMPATIBLE
+            and r.candidate_part_number not in exclude
+            and all(
+                x.outcome is not RuleOutcome.FAIL for x in r.rule_results if x.rule_id == "R-CAT"
+            )
+        ]
+        failed.sort(key=lambda r: (-r.score, r.candidate_part_number))
+        out = []
+        for r in failed[:MAX_REJECTED]:
+            product = self.products[r.candidate_part_number]
+            description = (
+                product.commercial.description if product.commercial else product.part_number
+            )
+            out.append((r.candidate_part_number, description, fail_reasons(r)))
+        return out
+
+    @staticmethod
+    def _by_price(recommendations: Sequence[Recommendation], run: _Run) -> list[Recommendation]:
+        """ "Lo más barato": within the same compatibility level, cheaper first."""
+        recs = list(recommendations)
+        if not CHEAP.search(run.query.text) or len(recs) < 2:
+            return recs
+        recs.sort(
+            key=lambda r: (
+                LEVEL_ORDER.index(r.compatibility.level),
+                r.commercial.price_usd
+                if r.commercial.price_usd is not None
+                else Decimal("Infinity"),
+            )
+        )
+        run.warnings.append(
+            "Se pidió la opción más económica: mismo nivel de compatibilidad, menor precio primero."
+        )
+        return [r.model_copy(update={"rank": i}) for i, r in enumerate(recs, start=1)]
 
     def _response(
         self,
@@ -320,12 +472,13 @@ class AdvisorAgent:
         message: str | None = None,
         blocked: Mapping[str, CompatibilityResult] | None = None,
         unverified: Sequence[Recommendation] = (),
+        rejected: Sequence[tuple[str, str, Sequence[str]]] = (),
     ) -> RecommendationResponse:
         recs = list(recommendations)
         risk = list(risky)
         if message is None:
             run.trace.append(AgentStep.COMPOSE)
-            draft = draft_message(original, recs, risk, blocked or {}, unverified)
+            draft = draft_message(original, recs, risk, blocked or {}, unverified, rejected)
             message = self._rephrase(draft, run)
         else:
             run.providers.append("template")

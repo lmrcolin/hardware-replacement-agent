@@ -5,6 +5,17 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
+# Interfaces and standards that look like part numbers ("I2C", "DDR5") but are requirements.
+TECH_TERMS = re.compile(
+    r"^(?:i2c|i2s|i3c|spi|uart|usb\d*|pcie\d*|gen\d|ddr\d|lpddr\d+x?|gddr\d+x?|hbm\d+e?"
+    r"|sxm\d|nvlink\d*|wifi\d*|802\.11\w*|qsfp\d+|sfp\d+|m\.2|u\.2|x\d+|armv[\d.]+\w*)$",
+    re.I,
+)
+
+
+def is_technical_term(token: str) -> bool:
+    return TECH_TERMS.match(token) is not None
+
 
 def normalize_part(text: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", text.upper())

@@ -106,3 +106,36 @@ def test_chain_always_ends_with_template() -> None:
                                                  "ollama_host": "http://127.0.0.1:9"}})  # fmt: skip
     chain = build_llm_chain(settings)
     assert [c.name for c in chain] == ["template"]  # no profile, no ollama → template only
+
+
+def test_claude_option_falls_back_to_templates_until_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from advisor.config import Settings
+    from advisor.llm import build_llm_chain, claude_status
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert claude_status().startswith("falta ANTHROPIC_API_KEY")
+    assert [c.name for c in build_llm_chain(Settings(), "claude")] == ["template"]
+
+
+def test_claude_option_uses_the_team_client_when_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    import sys
+    import types
+
+    from advisor.config import Settings
+    from advisor.llm import TemplateClient, build_llm_chain
+
+    class FakeClaude(TemplateClient):
+        name = "claude"
+
+        def __init__(self, model: str, timeout_s: float) -> None:
+            self.model = model
+
+    module = types.ModuleType("advisor.llm.claude")
+    module.ClaudeClient = FakeClaude  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "advisor.llm.claude", module)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-not-a-real-key")
+    chain = build_llm_chain(Settings(), "claude")
+    assert [c.name for c in chain] == ["claude", "template"]
+    assert build_llm_chain(Settings(), "ours")[-1].name == "template"  # our chain is unchanged

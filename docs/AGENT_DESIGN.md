@@ -37,3 +37,16 @@ sinónimos). Las intenciones explícitas por palabras (reemplazo, comparación, 
 **VERIFY**: toda cifra o part number del texto del LLM debe estar en el borrador o el catálogo; si no, se muestra
 el borrador y se avisa. Cadena LLM: `databricks` con perfil explícito, o con el perfil por defecto cuando el modo es
 Databricks (Delta o AI Search); `ollama` si responde; `template` siempre al final.
+
+## Selector de LLM en el chat ("Modelo de lenguaje")
+
+- **Nuestro LLM** (por defecto): la cadena configurada, Llama 3.3 en Databricks → Ollama → plantillas.
+- **Claude (API key)**: `build_agent(llm="claude")` usa solo el cliente de Claude, con plantillas de respaldo.
+  Se activa solo cuando existen las dos piezas:
+  1. `src/advisor/llm/claude.py` con `class ClaudeClient(LLMClient)`: `name = "claude"`, constructor
+     `ClaudeClient(model: str, timeout_s: float)`, que lee la key de `ANTHROPIC_API_KEY` (nunca en código) e
+     implementa `complete_json` (JSON validado por el esquema; `LLMUnavailableError` si falla) y `generate`.
+  2. `ANTHROPIC_API_KEY` en `.env` (ignorado por git; en `.env.example` solo el nombre de la variable vacío).
+  Modelo: `llm.claude_model` (`ADVISOR_CLAUDE_MODEL`). Mientras falte algo, la UI lo dice y responde con plantillas.
+- En ambos casos el LLM solo interpreta, planifica y redacta; las herramientas deterministas y el catálogo deciden,
+  y VERIFY rechaza cifras no verificadas.

@@ -7,7 +7,7 @@ from advisor.llm.base import (
     OllamaClient,
     TemplateClient,
 )
-from advisor.llm.chain import build_llm_chain, complete_json, generate
+from advisor.llm.chain import build_llm_chain, claude_status, complete_json, generate
 from advisor.llm.prompts import build_nlg_prompt, build_nlu_prompt, build_planner_prompt
 from advisor.llm.rules import parse_query
 
@@ -21,6 +21,7 @@ __all__ = [
     "build_nlg_prompt",
     "build_nlu_prompt",
     "build_planner_prompt",
+    "claude_status",
     "complete_json",
     "generate",
     "parse_query",

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Sequence
 
 from pydantic import BaseModel, ValidationError
 
-from advisor.config import Settings
+from advisor.config import LLMChoice, Settings
 from advisor.llm.base import (
     DatabricksFMAPIClient,
     LLMClient,
@@ -41,8 +42,39 @@ def _wants_databricks(settings: Settings) -> bool:
     return on_databricks and _databricks_configured(None)
 
 
-def build_llm_chain(settings: Settings) -> list[LLMClient]:
-    """Configured providers that can actually answer; TemplateClient is always appended."""
+CLAUDE_KEY_ENV = "ANTHROPIC_API_KEY"  # read from the environment / .env, never from code
+
+
+def claude_status() -> str:
+    """ "ready", or why the Claude option cannot be used yet."""
+    if not os.environ.get(CLAUDE_KEY_ENV):
+        return f"falta {CLAUDE_KEY_ENV} en .env"
+    try:
+        from advisor.llm import claude  # noqa: F401  (client implemented by the team: llm/claude.py)
+    except ImportError:
+        return "falta el cliente advisor.llm.claude.ClaudeClient"
+    return "ready"
+
+
+def _claude_client(settings: Settings) -> LLMClient | None:
+    """``ClaudeClient(model, timeout_s)`` from ``advisor/llm/claude.py`` (an ``LLMClient`` named
+    "claude" that reads ``ANTHROPIC_API_KEY``), when it exists and a key is configured."""
+    if claude_status() != "ready":
+        return None
+    from advisor.llm.claude import ClaudeClient  # type: ignore[import-not-found,unused-ignore]
+
+    client: LLMClient = ClaudeClient(settings.llm.claude_model, settings.llm.timeout_s)
+    return client
+
+
+def build_llm_chain(settings: Settings, choice: LLMChoice = "ours") -> list[LLMClient]:
+    """Configured providers that can actually answer; TemplateClient is always appended.
+
+    ``choice="claude"`` (chat selector) uses only the Claude API client, with templates as the
+    fallback; ``"ours"`` is the configured chain (Llama on Databricks → Ollama → templates)."""
+    if choice == "claude":
+        claude = _claude_client(settings)
+        return [claude, TemplateClient()] if claude else [TemplateClient()]
     chain: list[LLMClient] = []
     for name in settings.llm.providers:
         if name == "databricks" and _wants_databricks(settings):
@@ -59,6 +91,10 @@ def build_llm_chain(settings: Settings) -> list[LLMClient]:
             )
             if ollama.is_available():
                 chain.append(ollama)
+        elif name == "claude":
+            claude = _claude_client(settings)
+            if claude is not None:
+                chain.append(claude)
         elif name == "template":
             chain.append(TemplateClient())
     if not chain or not isinstance(chain[-1], TemplateClient):

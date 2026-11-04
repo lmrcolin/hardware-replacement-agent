@@ -10,6 +10,7 @@ question before it is sent, because the agent itself is stateless per query.
 
 from __future__ import annotations
 
+import logging
 import sys
 import uuid
 from dataclasses import dataclass, field
@@ -17,7 +18,6 @@ from html import escape
 from pathlib import Path
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -52,6 +52,7 @@ from advisor.pipeline import (
     retrieval_status,
 )
 
+log = logging.getLogger("advisor.app")
 REAL, MOCK = "Real (catálogo + datasheets)", "Simulado (fixtures)"
 EXAMPLES = {
     "Caso oficial (Intel E810)": (
@@ -111,6 +112,7 @@ def _transcriber(audio: bytes) -> str:
     try:
         return transcribe(audio, vocabulary=_vocabulary())
     except Exception as exc:  # model download or decoding problems must not break the chat
+        log.exception("voice transcription failed")
         state["voice_error"] = f"No pude transcribir el audio ({str(exc)[:160]})."
         return ""
 
@@ -251,6 +253,13 @@ with st.container(key="widget-head"):
             if voice_available()
             else "Para hablarle al agente instala la voz: `uv sync --extra voice`."
         )
+        if voice_available():
+            st.caption(
+                "Si al grabar aparece un error de micrófono: abre la app en Chrome o Edge en "
+                "`http://localhost:8501` (el navegador integrado de VS Code y la dirección de red "
+                "`http://<ip>:8501` no permiten micrófono) y elige **Permitir** en el aviso o en "
+                "el candado de la barra de direcciones."
+            )
         st.caption(
             "Cómo decide: estado, precio y stock salen solo del catálogo; la compatibilidad la "
             "deciden reglas deterministas con evidencia; solo recomienda piezas ACTIVE; el LLM "
@@ -353,7 +362,8 @@ for i, turn in enumerate(turns):
 # Read the newest answer aloud once: always for dictated questions, or when the toggle is on.
 if turns and state.get("spoken") != turns[-1].id and (turns[-1].voice or state.get("tts")):
     last = turns[-1].response
-    components.html(speak_html(last.clarification_question or last.message), height=0)
+    with st.container(key="tts"):  # hidden; the script inside only calls speechSynthesis
+        st.iframe(speak_html(last.clarification_question or last.message), height=1)
     state["spoken"] = turns[-1].id
 if state.get("voice_error"):
     st.warning(state.pop("voice_error"))

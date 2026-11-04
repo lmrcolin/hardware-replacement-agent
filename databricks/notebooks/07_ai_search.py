@@ -152,6 +152,12 @@ def index_exists_or_created() -> bool:
 
 wait(f"crear índice {INDEX}", index_exists_or_created, INDEX_TIMEOUT_S)
 
+# Un índice nuevo no hereda permisos: solo su creador (dueño) podría sincronizarlo y el run_all de
+# otra persona fallaría. El creador da acceso al equipo en cuanto lo crea (idempotente).
+if created:
+    spark.sql(f"GRANT ALL PRIVILEGES ON TABLE {INDEX} TO `account users`")
+    print(f"permisos: ALL PRIVILEGES sobre {INDEX} para account users")
+
 # create_index devuelve CreateVectorIndexResponse (sin endpoint_name/spec): se relee siempre.
 index = ws.vector_search_indexes.get_index(INDEX)
 spec = index.delta_sync_index_spec

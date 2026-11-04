@@ -343,3 +343,8 @@ table.specs .fail { color: var(--red-fg); } table.specs .miss { color: var(--tex
 [data-testid="stSidebar"] [data-testid="stPopover"] { margin-top: var(--s6); }
 [data-testid="stSidebar"] [data-testid="stPopover"] button { color: var(--text-3); font-size: var(--fs-13); padding-left: var(--s2); }
 [data-testid="stSidebar"] [data-testid="stPopover"] button div[aria-hidden="true"] { display: none; }
+
+/* Mientras el agente piensa, Streamlit deja visibles (desvanecidos) los elementos de la vista
+   anterior hasta que termina la ejecución; lo que va después del mensaje "pensando" son esos
+   restos (p. ej. el catálogo del inicio): se ocultan. */
+[data-testid="stLayoutWrapper"]:has(> .st-key-msg-agent-pending) ~ * { display: none !important; }
